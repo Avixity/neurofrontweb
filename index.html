@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroFront | Physiological Intelligence Platform</title>
+    <meta
+      name="description"
+      content="NeuroFront transforms realtime biosignals into adaptive intelligent insights using wearable sensing, AI analysis, and personalized calibration."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Sora:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="icon-512.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="is-loading">
+    <div class="page-loader" aria-hidden="true">
+      <div class="loader-core">
+        <img src="icon-512.png" alt="" class="loader-logo" />
+        <div class="loader-track" aria-hidden="true">
+          <span class="loader-progress"></span>
+        </div>
+        <p>Initializing physiological intelligence</p>
+      </div>
+    </div>
+
+    <div class="cursor-glow" aria-hidden="true"></div>
+    <canvas id="particle-canvas" aria-hidden="true"></canvas>
+
+    <div class="site-shell">
+      <div class="ambient ambient-one"></div>
+      <div class="ambient ambient-two"></div>
+      <div class="grid-overlay"></div>
+
+      <header class="site-header">
+        <nav class="nav">
+          <a href="#top" class="brand">
+            <img src="NEUROFRONTLOGO (white).png" alt="NeuroFront" />
+          </a>
+
+          <button
+            class="nav-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-label="Toggle navigation"
+          >
+            <span></span>
+            <span></span>
+          </button>
+
+          <div class="nav-links">
+            <a href="#about">About</a>
+            <a href="#sensors">Sensors</a>
+            <a href="https://neurofrontui.vercel.app/" target="_blank" rel="noreferrer">Dashboard</a>
+            <a href="#analytics">Analytics</a>
+            <a href="#future">Vision</a>
+            <a
+              href="https://neurofrontui.vercel.app/"
+              target="_blank"
+              rel="noreferrer"
+              class="nav-pill"
+              >Join NeuroFront</a
+            >
+          </div>
+        </nav>
+      </header>
+
+      <main id="top">
+        <section class="hero section">
+          <div class="hero-background">
+            <div class="hero-rings"></div>
+            <div class="hero-gradient"></div>
+            <svg
+              class="hero-wave hero-wave-top"
+              viewBox="0 0 1600 220"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M0,110 C90,70 150,150 250,110 C340,72 420,28 520,88 C630,154 690,170 770,112 C860,44 920,42 1015,98 C1110,154 1178,166 1270,118 C1365,70 1475,20 1600,90"
+              ></path>
+            </svg>
+          </div>
+
+          <div class="hero-copy reveal">
+            <p class="eyebrow">Biosignal Intelligence Platform</p>
+            <h1>Realtime Physiological Intelligence</h1>
+            <p class="hero-subheadline">
+              NeuroFront turns live biosignals into clear, adaptive insight with
+              wearable sensing, AI analysis, and personal calibration.
+            </p>
+
+            <div class="hero-actions">
+              <a href="#about" class="button button-primary">Explore NeuroFront</a>
+              <a
+                href="https://neurofrontui.vercel.app/"
+                target="_blank"
+                rel="noreferrer"
+                class="button button-secondary"
+                >View Live Dashboard</a
+              >
+            </div>
+
+            <div class="hero-metrics">
+              <article class="metric-card glass reveal">
+                <span class="metric-label">Personal Baseline</span>
+                <strong class="metric-value"><span data-count="50">0</span>/100</strong>
+                <p>Every user starts from their own calibrated reference point.</p>
+              </article>
+              <article class="metric-card glass reveal">
+                <span class="metric-label">Live Telemetry</span>
+                <strong class="metric-value"><span data-count="4">0</span> Streams</strong>
+                <p>Electrical, thermal, galvanic, and wireless signals in one flow.</p>
+              </article>
+            </div>
+          </div>
+
+          <div class="hero-visual reveal">
+            <div class="command-center glass parallax-card">
+              <div class="command-head">
+                <div>
+                  <p class="eyebrow">Live NeuroFront Command View</p>
+                  <h2>NeuroFront Live View</h2>
+                </div>
+                <span class="signal-pill online">Streaming</span>
+              </div>
+
+              <div class="command-grid">
+                <div class="device-stack">
+                  <div class="device-shell float-card">
+                    <img src="Headband.png" alt="NeuroFront wearable headband" />
+                  </div>
+                  <div class="device-shell device-shell-secondary float-card">
+                    <img src="Control Unit.png" alt="NeuroFront control unit" />
+                  </div>
+                </div>
+
+                <div class="telemetry-cluster">
+                  <article class="telemetry-card">
+                    <div class="telemetry-header">
+                      <span>Neural baseline</span>
+                      <span class="signal-dot"></span>
+                    </div>
+                    <div class="score-badge">50</div>
+                    <p>Resting signature stored to the user profile.</p>
+                    <canvas class="wave-canvas" width="320" height="120"></canvas>
+                  </article>
+
+                  <article class="telemetry-card telemetry-card-wide">
+                    <div class="telemetry-header">
+                      <span>Signal convergence</span>
+                      <span class="status-copy">AI Adaptive</span>
+                    </div>
+                    <div class="neural-grid">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                    <ul class="micro-list">
+                      <li>Bluetooth link active</li>
+                      <li>Signal drift within range</li>
+                    </ul>
+                  </article>
+                </div>
+              </div>
+
+              <div class="floating-pills">
+                <span class="hud-pill">Realtime monitoring</span>
+                <span class="hud-pill">Secure baseline storage</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="about" class="section about">
+          <div class="section-heading reveal">
+            <p class="eyebrow">About NeuroFront</p>
+            <h2>About NeuroFront</h2>
+            <p>NeuroFront reads change against the individual, not the average.</p>
+          </div>
+
+          <div class="about-grid">
+            <div class="about-cards">
+              <article class="about-card glass reveal">
+                <span class="card-icon about-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 4v4m0 8v4M4 12h4m8 0h4M6.8 6.8l2.8 2.8m4.8 4.8 2.8 2.8m0-10.4-2.8 2.8m-4.8 4.8-2.8 2.8"/></svg>
+                </span>
+                <h3>Personalized calibration</h3>
+                <p>A short resting session defines each user's reference state.</p>
+                <strong class="about-stat"><span data-count="50">0</span>/100 baseline</strong>
+              </article>
+              <article class="about-card glass reveal">
+                <span class="card-icon about-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M9 7l6 5-6 5"/><path d="M15 4l-4 3 4 3-4 3 4 3-4 4"/></svg>
+                </span>
+                <h3>Baseline score system</h3>
+                <p>50/100 becomes the neutral point for future comparison.</p>
+                <strong class="about-stat"><span data-count="100">0</span>% synced</strong>
+              </article>
+              <article class="about-card glass reveal">
+                <span class="card-icon about-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="17" cy="17" r="2"/><path d="M8.8 11.2l6.4-3.4M8.8 12.8l6.4 3.4"/></svg>
+                </span>
+                <h3>Adaptive analysis</h3>
+                <p>Live signals are interpreted in context and stored securely.</p>
+                <strong class="about-stat"><span data-count="12">0</span> profile layers</strong>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="sensors" class="section sensors">
+          <div class="section-heading reveal">
+            <p class="eyebrow">Sensor Ecosystem</p>
+            <h2>Sensor Ecosystem</h2>
+            <p>A compact hardware stack for clean, continuous signal capture.</p>
+          </div>
+
+          <div class="sensor-grid">
+            <article class="sensor-card glass reveal">
+              <div class="sensor-image-wrap">
+                <img src="ad8232.png" alt="AD8232 biosignal sensor" class="sensor-image" />
+              </div>
+              <div class="sensor-copy">
+                <span class="sensor-tag">AD8232 Biosignal Sensor</span>
+                <h3>Electrical activity</h3>
+                <p>Captures subtle microvolt-level physiological traces.</p>
+              </div>
+              <canvas class="wave-canvas" width="360" height="120"></canvas>
+            </article>
+
+            <article class="sensor-card glass reveal">
+              <div class="sensor-image-wrap">
+                <img src="gsr sensor.png" alt="Grove GSR Sensor V2.0" class="sensor-image" />
+              </div>
+              <div class="sensor-copy">
+                <span class="sensor-tag">Grove GSR Sensor V2.0</span>
+                <h3>Skin conductance</h3>
+                <p>Reads electrodermal change linked to arousal and stress.</p>
+              </div>
+              <canvas class="wave-canvas" width="360" height="120"></canvas>
+            </article>
+
+            <article class="sensor-card glass reveal">
+              <div class="sensor-image-wrap">
+                <img src="ntc10k.png" alt="NTC 10k thermistor" class="sensor-image sensor-image-small" />
+              </div>
+              <div class="sensor-copy">
+                <span class="sensor-tag">NTC 10k Thermistor</span>
+                <h3>Temperature drift</h3>
+                <p>Tracks subtle thermal variation across a session.</p>
+              </div>
+              <canvas class="wave-canvas" width="360" height="120"></canvas>
+            </article>
+
+            <article class="sensor-card glass reveal">
+              <div class="sensor-image-wrap">
+                <img src="esp 32.png" alt="ESP32" class="sensor-image" />
+              </div>
+              <div class="sensor-copy">
+                <span class="sensor-tag">ESP32 Control Layer</span>
+                <h3>Wireless compute</h3>
+                <p>Handles processing, Bluetooth, and live dashboard streaming.</p>
+              </div>
+              <canvas class="wave-canvas" width="360" height="120"></canvas>
+            </article>
+          </div>
+        </section>
+
+        <section class="section process">
+          <div class="section-heading reveal">
+            <p class="eyebrow">How It Works</p>
+            <h2>How It Works</h2>
+            <p>A simple flow from setup to live insight.</p>
+          </div>
+
+          <div class="timeline">
+            <div class="timeline-line"></div>
+            <article class="timeline-step glass reveal">
+              <div class="step-top">
+                <span class="card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 4v4m0 8v4M4 12h4m8 0h4M6.8 6.8l2.8 2.8m4.8 4.8 2.8 2.8m0-10.4-2.8 2.8m-4.8 4.8-2.8 2.8"/></svg>
+                </span>
+                <span class="step-index">1</span>
+              </div>
+              <h3>Calibration</h3>
+              <p>Resting activity is recorded.</p>
+            </article>
+            <article class="timeline-step glass reveal">
+              <div class="step-top">
+                <span class="card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M5 15.5V8.5a2.5 2.5 0 0 1 2.5-2.5h9A2.5 2.5 0 0 1 19 8.5v7a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 15.5Z"/><path d="M8 12h8"/></svg>
+                </span>
+                <span class="step-index">2</span>
+              </div>
+              <h3>Baseline Creation</h3>
+              <p>50/100 is stored as the personal neutral point.</p>
+            </article>
+            <article class="timeline-step glass reveal">
+              <div class="step-top">
+                <span class="card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M3 12h4l2-4 4 8 2-4h6"/></svg>
+                </span>
+                <span class="step-index">3</span>
+              </div>
+              <h3>Live Signal Acquisition</h3>
+              <p>Sensors stream data over Bluetooth.</p>
+            </article>
+            <article class="timeline-step glass reveal">
+              <div class="step-top">
+                <span class="card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="17" cy="17" r="2"/><path d="M8.8 11.2l6.4-3.4M8.8 12.8l6.4 3.4"/></svg>
+                </span>
+                <span class="step-index">4</span>
+              </div>
+              <h3>AI Signal Processing</h3>
+              <p>AI reads change against that baseline.</p>
+            </article>
+            <article class="timeline-step glass reveal">
+              <div class="step-top">
+                <span class="card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M5 14a7 7 0 1 1 14 0"/><path d="M12 7v7l4 2"/></svg>
+                </span>
+                <span class="step-index">5</span>
+              </div>
+              <h3>Neuro Score Generation</h3>
+              <p>Above 50 rises. Below 50 settles.</p>
+            </article>
+            <article class="timeline-step glass reveal">
+              <div class="step-top">
+                <span class="card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M9 9h6M8 14h3m2 0h3"/></svg>
+                </span>
+                <span class="step-index">6</span>
+              </div>
+              <h3>Dashboard Visualization</h3>
+              <p>Insights appear live on the dashboard.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="dashboard" class="section dashboard-section">
+          <div class="section-heading reveal">
+            <p class="eyebrow">Live Biosignal Dashboard</p>
+            <h2>Live Biosignal Dashboard</h2>
+            <p>Clear telemetry, quiet surfaces, and just enough signal detail.</p>
+          </div>
+
+          <div class="dashboard-stage reveal">
+            <div class="dashboard-frame glass parallax-card">
+              <div class="frame-header">
+                <div>
+                  <span class="frame-label">Realtime Command Interface</span>
+                  <h3>Live biosignal command view</h3>
+                </div>
+                <div class="frame-status">
+                  <a
+                    href="https://neurofrontui.vercel.app/"
+                    target="_blank"
+                    rel="noreferrer"
+                    class="signal-pill"
+                    >Open Webapp</a
+                  >
+                </div>
+              </div>
+
+              <a
+                href="https://neurofrontui.vercel.app/"
+                target="_blank"
+                rel="noreferrer"
+                class="dashboard-screen"
+              >
+                <img src="Dashboard.png" alt="NeuroFront dashboard interface" />
+
+                <div class="hud-overlay hud-overlay-top-left">
+                  <span>Primary Trace</span>
+                  <strong>Live Ready</strong>
+                </div>
+                <div class="hud-overlay hud-overlay-top-right">
+                  <span>Stress meter</span>
+                  <strong>50 / 100</strong>
+                </div>
+                <div class="hud-overlay hud-overlay-bottom-left">
+                  <span>Signal scan</span>
+                  <strong>Realtime telemetry aligned</strong>
+                </div>
+                <div class="scan-line"></div>
+                <div class="pulse-orb pulse-orb-one"></div>
+                <div class="pulse-orb pulse-orb-two"></div>
+              </a>
+            </div>
+
+            <div class="dashboard-sidebar">
+              <article class="sidebar-card glass reveal">
+                <span class="sidebar-label">Waveform panel</span>
+                <h3>Adaptive signal trace</h3>
+                <canvas class="wave-canvas" width="360" height="130"></canvas>
+              </article>
+              <article class="sidebar-card glass reveal">
+                <span class="sidebar-label">Connection state</span>
+                <h3>Bluetooth uplink stable</h3>
+                <div class="status-stack">
+                  <div class="status-row">
+                    <span>Wearable</span>
+                    <span class="status-good">Connected</span>
+                  </div>
+                  <div class="status-row">
+                    <span>Control Unit</span>
+                    <span class="status-good">Streaming</span>
+                  </div>
+                  <div class="status-row">
+                    <span>AI Layer</span>
+                    <span class="status-good">Interpreting</span>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="section ai-section">
+          <div class="section-heading reveal">
+            <p class="eyebrow">AI Analysis Layer</p>
+            <h2>AI Analysis</h2>
+            <p>NeuroFront learns each user's normal, then highlights what matters.</p>
+          </div>
+
+          <div class="ai-layout">
+            <div class="ai-visual glass reveal">
+              <div class="network-visual">
+                <span class="node node-1"></span>
+                <span class="node node-2"></span>
+                <span class="node node-3"></span>
+                <span class="node node-4"></span>
+                <span class="node node-5"></span>
+                <span class="node node-6"></span>
+                <span class="beam beam-1"></span>
+                <span class="beam beam-2"></span>
+                <span class="beam beam-3"></span>
+                <span class="beam beam-4"></span>
+              </div>
+              <div class="analysis-readout">
+                <article>
+                  <span>Elevated stress detected</span>
+                  <strong>+12 vs baseline</strong>
+                </article>
+                <article>
+                  <span>Stable physiological state</span>
+                  <strong>Low drift</strong>
+                </article>
+                <article>
+                  <span>Recovery state improving</span>
+                  <strong>Trend positive</strong>
+                </article>
+                <article>
+                  <span>Abnormal signal deviation</span>
+                  <strong>Flag if persistent</strong>
+                </article>
+              </div>
+            </div>
+
+            <div class="ai-copy">
+              <article class="insight-card glass reveal">
+                <h3>Baseline-aware</h3>
+                <p>
+                  Every insight is measured against the user's own calibration.
+                </p>
+              </article>
+              <article class="insight-card glass reveal">
+                <h3>Trend aware</h3>
+                <p>Session history reveals recurring patterns over time.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="analytics" class="section analytics-section">
+          <div class="section-heading reveal">
+            <p class="eyebrow">Exportable Graph Analytics</p>
+            <h2>Analytics</h2>
+            <p>Review sessions, replay telemetry, and export polished reports.</p>
+          </div>
+
+          <div class="analytics-grid">
+            <article class="analytics-panel analytics-panel-large glass reveal">
+              <div class="panel-header">
+                <div>
+                  <span class="panel-label">Session analytics</span>
+                  <h3>Physiological trend map</h3>
+                </div>
+                <a
+                  href="https://neurofrontui.vercel.app/"
+                  target="_blank"
+                  rel="noreferrer"
+                  class="ghost-button"
+                  >Open Dashboard</a
+                >
+              </div>
+              <canvas class="wave-canvas wave-canvas-wide" width="680" height="220"></canvas>
+              <div class="timeline-scrubber">
+                <span>00:00</span>
+                <div class="scrubber-track">
+                  <span class="scrubber-progress"></span>
+                </div>
+                <span>18:32</span>
+              </div>
+            </article>
+
+            <article class="analytics-panel glass reveal">
+              <div class="panel-header">
+                <div>
+                  <span class="panel-label">Exports</span>
+                  <h3>Report builder</h3>
+                </div>
+              </div>
+              <div class="export-list">
+                <div class="export-row">
+                  <span>Signal overview</span>
+                  <span>Ready</span>
+                </div>
+                <div class="export-row">
+                  <span>Temperature trend</span>
+                  <span>Ready</span>
+                </div>
+                <div class="export-row">
+                  <span>Stress variability</span>
+                  <span>Ready</span>
+                </div>
+                <div class="export-row">
+                  <span>Calibration summary</span>
+                  <span>Ready</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="analytics-panel glass reveal">
+              <div class="panel-header">
+                <div>
+                  <span class="panel-label">Playback</span>
+                  <h3>Historical signal replay</h3>
+                </div>
+              </div>
+              <div class="playback-bars">
+                <span style="--bar: 66%"></span>
+                <span style="--bar: 38%"></span>
+                <span style="--bar: 82%"></span>
+                <span style="--bar: 55%"></span>
+                <span style="--bar: 74%"></span>
+                <span style="--bar: 41%"></span>
+                <span style="--bar: 89%"></span>
+                <span style="--bar: 62%"></span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="section features-section">
+          <div class="section-heading reveal">
+            <p class="eyebrow">Platform Features</p>
+            <h2>Platform Features</h2>
+          </div>
+
+          <div class="features-grid">
+            <article class="feature-card glass reveal">
+              <span class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 4v4m0 8v4M4 12h4m8 0h4M6.8 6.8l2.8 2.8m4.8 4.8 2.8 2.8m0-10.4-2.8 2.8m-4.8 4.8-2.8 2.8"/></svg>
+              </span>
+              <h3>Personalized calibration</h3>
+            </article>
+            <article class="feature-card glass reveal">
+              <span class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M5 15.5V8.5a2.5 2.5 0 0 1 2.5-2.5h9A2.5 2.5 0 0 1 19 8.5v7a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 15.5Z"/><path d="M8 12h8"/></svg>
+              </span>
+              <h3>Adaptive baseline scoring</h3>
+            </article>
+            <article class="feature-card glass reveal">
+              <span class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="17" cy="17" r="2"/><path d="M8.8 11.2l6.4-3.4M8.8 12.8l6.4 3.4"/></svg>
+              </span>
+              <h3>AI-powered biosignal analysis</h3>
+            </article>
+            <article class="feature-card glass reveal">
+              <span class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M9 7l6 5-6 5"/><path d="M15 4l-4 3 4 3-4 3 4 3-4 4"/></svg>
+              </span>
+              <h3>Bluetooth connectivity</h3>
+            </article>
+            <article class="feature-card glass reveal">
+              <span class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m14 0h3M2 15h3m14 0h3"/></svg>
+              </span>
+              <h3>ESP32 wireless streaming</h3>
+            </article>
+            <article class="feature-card glass reveal">
+              <span class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 12h4l2-4 4 8 2-4h6"/></svg>
+              </span>
+              <h3>Realtime physiological tracking</h3>
+            </article>
+            <article class="feature-card glass reveal">
+              <span class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 7v5l3 3"/><circle cx="12" cy="12" r="8"/></svg>
+              </span>
+              <h3>Historical analytics</h3>
+            </article>
+            <article class="feature-card glass reveal">
+              <span class="card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="m8 10 4 4 4-4"/><path d="M5 19h14"/></svg>
+              </span>
+              <h3>Exportable graphs and reports</h3>
+            </article>
+          </div>
+        </section>
+
+        <section id="future" class="section future-section">
+          <div class="future-copy reveal">
+            <p class="eyebrow">Future of Human Interfaces</p>
+            <h2>Future of Human Interfaces</h2>
+            <p>
+              Systems that understand the body in real time will feel more human,
+              more adaptive, and more useful.
+            </p>
+          </div>
+
+          <div class="future-stage">
+            <div class="future-quote reveal">
+              <p>
+                Human signals are becoming a new interface layer.
+              </p>
+            </div>
+
+            <div class="future-collage">
+              <article class="future-card glass reveal">
+                <img src="Headband.png" alt="NeuroFront wearable hardware" />
+              </article>
+              <article class="future-card glass reveal">
+                <img src="Control Unit.png" alt="NeuroFront wireless control unit" />
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="cta" class="section cta-section">
+          <div class="cta-wave"></div>
+          <div class="cta-shell glass reveal">
+            <p class="eyebrow">NeuroFront Awaits</p>
+            <h2>Step Into NeuroFront</h2>
+            <p>Adaptive wearable technology with realtime biosignal insight.</p>
+            <div class="hero-actions">
+              <a
+                href="https://neurofrontui.vercel.app/"
+                target="_blank"
+                rel="noreferrer"
+                class="button button-primary"
+                >Join NeuroFront</a
+              >
+              <a
+                href="https://neurofrontui.vercel.app/"
+                target="_blank"
+                rel="noreferrer"
+                class="button button-secondary"
+                >View Prototype</a
+              >
+              <a
+                href="https://neurofrontui.vercel.app/"
+                target="_blank"
+                rel="noreferrer"
+                class="button button-secondary"
+                >Explore Dashboard</a
+              >
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/ScrollTrigger.min.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
