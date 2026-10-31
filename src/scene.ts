@@ -1,296 +1,279 @@
 import * as THREE from 'three';
-import gsap from 'gsap';
 import { buildDevice } from './model';
+import type { ComponentKey } from './components';
+import type { StoryState } from './story';
 
-type StoryState = { open: number; explode: number; sensor: number };
-type SceneOptions = { intro: boolean; reducedMotion: boolean; onIntroComplete: () => void; onFailure: () => void };
+type Options = { mobile: boolean; reducedMotion: boolean; onFailure: () => void; onSelect: (part: ComponentKey) => void; onExpand: () => void };
 export interface DeviceScene {
-  setStory: (state: StoryState) => void;
-  setSensor: (sensor: string) => void;
-  setView: (view: string, instant: boolean) => void;
-  setPaused: (paused: boolean) => void;
+  setStory(state: StoryState, instant?: boolean): void;
+  select(part: ComponentKey | null): void;
+  setPaused(value: boolean): void;
+  setVisible(value: boolean): void;
+  setExpanded(value: boolean): void;
+  resize(width: number, height: number, mobile: boolean): void;
+  setIntro(progress: number): void;
+  projectLogo(): { x: number; y: number }[];
+  capturePart(part: ComponentKey): string;
+  dispose(): void;
 }
 
-export async function createDeviceScene(host: HTMLElement, options: SceneOptions): Promise<DeviceScene> {
-  const image = new Image();
-  image.src = '/assets/logo-white.png';
-  await image.decode();
-  const mobile = () => innerWidth <= 760;
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, mobile() ? 1.35 : 1.65));
+export async function createDeviceScene(host: HTMLElement, options: Options): Promise<DeviceScene> {
+  let mobile = options.mobile;
+  let pixelRatio = Math.min(devicePixelRatio, mobile ? .85 : 1.25);
+  const renderer = new THREE.WebGLRenderer({ antialias: !mobile, alpha: true, powerPreference: 'low-power' });
+  renderer.setPixelRatio(pixelRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !mobile;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   host.appendChild(renderer.domElement);
-
+  host.dataset.quality = mobile ? 'mobile' : 'desktop';
   const world = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(34, 1, .1, 100);
-  world.add(new THREE.HemisphereLight('#ecf1e9', '#293b32', 1.55));
-  const key = new THREE.DirectionalLight('#fff3dd', 2.8);
-  key.position.set(-3, 7, 5);
-  key.castShadow = true;
-  key.shadow.mapSize.setScalar(mobile() ? 512 : 1024);
-  key.shadow.camera.left = -7; key.shadow.camera.right = 7;
-  key.shadow.camera.top = 6; key.shadow.camera.bottom = -6;
+  world.add(new THREE.HemisphereLight('#ecf1e9', '#293b32', 1.7));
+  const key = new THREE.DirectionalLight('#fff3dd', 3);
+  key.position.set(-3, 7, 5); key.castShadow = !mobile;
+  key.shadow.mapSize.setScalar(1024);
+  Object.assign(key.shadow.camera, { left: -7, right: 7, top: 6, bottom: -6 });
   key.shadow.normalBias = .035; key.shadow.bias = -.0002;
-  key.shadow.radius = 4;
   world.add(key);
-  const rim = new THREE.DirectionalLight('#aed8cc', 2.4);
-  rim.position.set(2, 4, -5); world.add(rim);
-  const fill = new THREE.DirectionalLight('#dce3df', 2.1);
+  const fill = new THREE.DirectionalLight('#c9e2d8', 2.2);
   fill.position.set(2, 3, 7); world.add(fill);
-
-  const device = buildDevice();
+  const device = buildDevice({ mobile });
   world.add(device.group);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.ShadowMaterial({ opacity: .20 }));
-  ground.rotation.x = -Math.PI / 2; ground.position.y = -.055; ground.receiveShadow = true;
-  world.add(ground);
-
-  const state = { open: 0, explode: 0, sensor: 0, focusX: .25, focusZoom: 1, pointerX: 0, pointerY: 0 };
-  let selectedSensor = 'electrical';
-  let paused = options.reducedMotion;
-  let introActive = options.intro && scrollY < 15 && document.documentElement.classList.contains('intro-pending')
-    && performance.now() < Number(document.documentElement.dataset.introDeadline || 0);
-  let dirty = true;
-  let visible = true;
-  let disposed = false;
-  let frames = 0;
-  const target = new THREE.Vector3(0, .3, 0);
-  const point = new THREE.Vector3();
-  const labels = Array.from(document.querySelectorAll<HTMLElement>('.model-label'));
-  const sceneWrap = host.parentElement!;
-  const heroPosition = new THREE.Vector3(5.4, 7.3, 9.4);
-  const openPosition = new THREE.Vector3(4.6, 8.4, 8.9);
-  const sensorPosition = new THREE.Vector3(3.3, 7.3, 8.5);
-  const smooth = (n: number) => n * n * (3 - 2 * n);
-  const clamp = THREE.MathUtils.clamp;
-
-  function resize() {
-    const width = host.clientWidth, height = host.clientHeight;
-    if (!width || !height) return;
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    renderer.setSize(width, height, false);
-    renderer.setPixelRatio(Math.min(devicePixelRatio, mobile() ? 1.35 : 1.65));
-    if (!introActive) { positionCamera(); updateLabels(); }
-    dirty = true;
+  const shadowCanvas = document.createElement('canvas');
+  shadowCanvas.width = shadowCanvas.height = 64;
+  const context = shadowCanvas.getContext('2d')!;
+  const gradient = context.createRadialGradient(32, 32, 2, 32, 32, 32);
+  gradient.addColorStop(0, 'rgba(0,0,0,.5)'); gradient.addColorStop(1, 'rgba(0,0,0,0)');
+  context.fillStyle = gradient; context.fillRect(0, 0, 64, 64);
+  const shadowTexture = new THREE.CanvasTexture(shadowCanvas);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(7.5, 4.5), new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false }));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -.04; world.add(ground);
+  let logoTexture: THREE.Texture;
+  try {
+    logoTexture = await new THREE.TextureLoader().loadAsync('/assets/logo-traced.svg');
+  } catch (error) {
+    device.dispose(); ground.geometry.dispose(); (ground.material as THREE.Material).dispose(); shadowTexture.dispose(); key.shadow.dispose(); renderer.dispose(); renderer.domElement.remove();
+    throw error;
   }
-  const resizeObserver = new ResizeObserver(resize);
-  resizeObserver.observe(host);
-  resize();
+  logoTexture.colorSpace = THREE.SRGBColorSpace;
+  const logoMaterial = device.logo.material as THREE.MeshBasicMaterial;
+  logoMaterial.map = logoTexture; logoMaterial.needsUpdate = true;
 
+  const current = { open: 0, explode: 0, sensor: 0, dock: 0, yaw: 0, pitch: 0, viewer: 0 };
+  const target = { ...current };
+  let selection: ComponentKey | null = null;
+  let paused = options.reducedMotion, visible = true, expanded = false, disposed = false;
+  let dirty = true, frame = 0, frames = 0, lastTime = 0, width = 1, height = 1, intro = 1, initialized = false;
+  let selectionDirty = true;
+  const labels = [...document.querySelectorAll<HTMLElement>('.model-label')];
+  const point = new THREE.Vector3();
+  const cameraTarget = new THREE.Vector3();
+  const cameraDirection = new THREE.Vector3();
+  const orbitDirection = new THREE.Vector3();
+  const samples: { gap: number; cost: number }[] = [];
+  const inspection = new URLSearchParams(location.search).has('inspect');
+  let qualityChanges = 0;
+  const keys: ComponentKey[] = ['ad8232', 'esp32', 'gsr', 'temperature', 'battery', 'charger'];
+  const proxies: THREE.Mesh[] = [];
+  device.group.updateMatrixWorld(true);
+  keys.forEach(part => {
+    const group = device.parts[part];
+    const box = new THREE.Box3().setFromObject(group);
+    const center = group.worldToLocal(box.getCenter(new THREE.Vector3()));
+    const size = box.getSize(new THREE.Vector3());
+    size.set(Math.max(.2, size.x), Math.max(.16, size.y), Math.max(.2, size.z));
+    const proxy = new THREE.Mesh(new THREE.BoxGeometry(size.x * 1.12, size.y * 1.12, size.z * 1.12), new THREE.MeshBasicMaterial({ visible: false }));
+    proxy.position.copy(center); proxy.userData.partKey = part; group.add(proxy); proxies.push(proxy);
+  });
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+
+  function schedule() {
+    if (initialized && !frame && !disposed && visible && !document.hidden) frame = requestAnimationFrame(tick);
+  }
+  function invalidate() { dirty = true; schedule(); }
   function positionCamera() {
-    camera.position.copy(heroPosition).lerp(openPosition, state.open).lerp(sensorPosition, state.sensor);
-    // A wider framing keeps the whole wired assembly visible on a portrait screen.
-    const aspectScale = Math.max(1, 1.04 / camera.aspect);
-    camera.position.multiplyScalar(mobile() ? Math.max(.88, aspectScale * .87) : aspectScale);
-    camera.position.multiplyScalar(THREE.MathUtils.lerp(1, state.focusZoom, state.sensor));
-    target.set(state.sensor * state.focusX + state.open * .22, .3 + state.explode * .30, 0);
-    camera.position.x += state.pointerX * .35;
-    camera.position.z += state.pointerY * .25;
-    camera.lookAt(target);
+    cameraTarget.set(current.open * .22 + current.dock * .4, .3 + current.explode * .30, 0);
+    cameraDirection.set(5.4, 7.3 + current.open * 1.2, 9.4 - current.sensor * .5);
+    cameraDirection.multiplyScalar(Math.max(.92, 1.04 / camera.aspect));
+    if (mobile) cameraDirection.multiplyScalar(.8 - current.viewer * .16 + current.explode * .08);
+    cameraDirection.multiplyScalar(1 - current.dock * (mobile ? .25 : .30));
+    cameraDirection.multiplyScalar(.78 + intro * .22);
+    if (current.viewer > 0) {
+      const radius = cameraDirection.length();
+      const phi = THREE.MathUtils.clamp(.8 + current.pitch, .22, 1.42);
+      orbitDirection.setFromSphericalCoords(radius, phi, .52 + current.yaw);
+      cameraDirection.lerp(orbitDirection, current.viewer);
+    }
+    camera.position.copy(cameraTarget).add(cameraDirection); camera.lookAt(cameraTarget);
   }
   function updateLabels() {
-    if (introActive) { labels.forEach(label => label.style.opacity = '0'); return; }
+    const showLabels = intro === 1 && current.explode > .6 && current.dock < .15 && !expanded;
     device.group.updateMatrixWorld(true);
-    const width = host.clientWidth, height = host.clientHeight;
     labels.forEach(label => {
-      const part = device.parts[label.dataset.part!];
-      if (!part) return;
-      const isSignal = state.sensor > .5;
-      const show = state.explode > .25 && state.open > .75 && (isSignal
-        ? label.dataset.part === (selectedSensor === 'electrical' ? 'ad8232' : selectedSensor === 'eda' ? 'gsr' : 'temperature')
-        : !['gsr', 'temperature'].includes(label.dataset.part!));
-      part.getWorldPosition(point);
-      point.y += .22;
-      point.project(camera);
-      const x = (point.x * .5 + .5) * width;
-      const y = (-point.y * .5 + .5) * height - 28;
-      const offset = label.dataset.part === 'ad8232' ? -30 : label.dataset.part === 'esp32' ? 34 : label.dataset.part === 'battery' ? -27 : 25;
-      const safeX = clamp(x + offset, 65, width - 65);
-      label.style.transform = `translate(${safeX.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`;
-      label.style.opacity = show && point.z < 1 && y > 20 && y < height - 50 ? '1' : '0';
+      const name = label.dataset.part as ComponentKey;
+      const show = showLabels && (selection ? selection === name : !mobile && !['gsr', 'temperature'].includes(name));
+      label.style.opacity = show ? '1' : '0';
+      if (!show) return;
+      device.parts[name].getWorldPosition(point); point.y += .2; point.project(camera);
+      const offset = name === 'battery' ? -50 : name === 'ad8232' ? -40 : 35;
+      const x = THREE.MathUtils.clamp((point.x * .5 + .5) * width + (selection ? 0 : offset), 75, width - 75);
+      const y = THREE.MathUtils.clamp((-point.y * .5 + .5) * height - (name === 'battery' ? 35 : 20), 45, height - 65);
+      label.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`;
     });
   }
   function updateDevice() {
-    device.animate(state.open, state.explode, state.sensor > .3 ? selectedSensor : '');
-    device.group.rotation.y = -.12 + state.open * .13 - state.sensor * .18;
-    positionCamera();
-    updateLabels();
-    host.dataset.open = state.open.toFixed(2);
-    host.dataset.explode = state.explode.toFixed(2);
-    host.dataset.sensor = selectedSensor;
-    dirty = true;
+    device.animate(current.open, current.explode, selection || '');
+    device.group.rotation.y = -.12 + current.open * .13 - current.sensor * .12;
+    positionCamera(); updateLabels(); selectionDirty = false;
+    host.dataset.open = current.open.toFixed(2); host.dataset.explode = current.explode.toFixed(2);
+    host.dataset.sensor = selection || ''; host.dataset.dock = current.dock.toFixed(2);
   }
-  function render() {
-    if (!visible || document.hidden || !dirty || disposed) return;
+  function draw() {
     renderer.render(world, camera);
+    host.dataset.frames = String(++frames);
     host.dataset.drawCalls = String(renderer.info.render.calls);
     host.dataset.triangles = String(renderer.info.render.triangles);
-    host.dataset.frames = String(++frames);
+    host.dataset.pixelRatio = pixelRatio.toFixed(2);
+    host.dataset.shadowMap = String(renderer.shadowMap.enabled);
     dirty = false;
   }
-  const visibilityObserver = new IntersectionObserver(entries => {
-    visible = entries[0].isIntersecting;
-    if (visible && !document.hidden) { dirty = true; renderer.setAnimationLoop(render); }
-    else renderer.setAnimationLoop(null);
-  });
-  visibilityObserver.observe(document.querySelector('#device-story')!);
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) renderer.setAnimationLoop(null);
-    else if (visible) { dirty = true; renderer.setAnimationLoop(render); }
-  });
-  renderer.domElement.addEventListener('webglcontextlost', event => {
-    event.preventDefault();
-    introTween?.kill();
-    gsap.killTweensOf(state);
-    finishIntro();
-    disposed = true;
-    renderer.setAnimationLoop(null);
-    resizeObserver.disconnect();
-    visibilityObserver.disconnect();
-    options.onFailure();
-  });
-  document.querySelector('#device-story')!.addEventListener('pointermove', event => {
-    if (paused || introActive || mobile() || (event as PointerEvent).pointerType === 'touch') return;
-    const mouse = event as PointerEvent;
-    gsap.to(state, { pointerX: (mouse.clientX / innerWidth - .5), pointerY: (mouse.clientY / innerHeight - .5), duration: .75, overwrite: 'auto', onUpdate: updateDevice });
-  });
-  document.querySelector('#device-story')!.addEventListener('pointerleave', () => {
-    if (!paused && !introActive) gsap.to(state, { pointerX: 0, pointerY: 0, duration: .8, overwrite: 'auto', onUpdate: updateDevice });
-  });
-
-  let introTween: gsap.core.Tween | undefined;
-  let finishIntro = () => {};
-  if (introActive) {
-    document.body.classList.add('intro-active');
-    document.documentElement.classList.remove('intro-pending');
-    const skip = document.querySelector<HTMLButtonElement>('#skip-intro')!;
-    skip.hidden = false;
-    const drawCanvas = document.createElement('canvas');
-    drawCanvas.width = image.naturalWidth; drawCanvas.height = image.naturalHeight;
-    const ctx = drawCanvas.getContext('2d')!;
-    const introTexture = new THREE.CanvasTexture(drawCanvas);
-    introTexture.colorSpace = THREE.SRGBColorSpace;
-    const logoWidth = 2.05;
-    const introLogo = new THREE.Mesh(new THREE.PlaneGeometry(logoWidth, logoWidth * image.naturalHeight / image.naturalWidth), new THREE.MeshBasicMaterial({ map: introTexture, transparent: true, depthTest: false, toneMapped: false }));
-    introLogo.renderOrder = 10;
-    world.add(introLogo);
-    device.logo.visible = false;
-    const originalMaterials = new Map<THREE.Material, { opacity: number; transparent: boolean }>();
-    device.group.traverse(object => {
-      if (object instanceof THREE.Mesh) {
-        (Array.isArray(object.material) ? object.material : [object.material]).forEach(material => {
-          if (!originalMaterials.has(material)) originalMaterials.set(material, { opacity: material.opacity, transparent: material.transparent });
-          material.transparent = true; material.opacity = 0;
-        });
-      }
-    });
-    const startRotation = new THREE.Quaternion();
-    const finalRotation = new THREE.Quaternion();
-    const finalPosition = new THREE.Vector3();
-    const finalScale = new THREE.Vector3();
-    device.group.rotation.y = -.12;
-    device.group.updateMatrixWorld(true);
-    device.logo.matrixWorld.decompose(finalPosition, finalRotation, finalScale);
-    const localWidth = (device.logo.geometry as THREE.PlaneGeometry).parameters.width;
-    const finalLogoScale = localWidth / logoWidth;
-    const counter = { value: .25 };
-    const introStarted = performance.now();
-    let introDeadline: ReturnType<typeof setTimeout>;
-    finishIntro = () => {
-      if (!introActive) return;
-      introTween?.kill();
-      clearTimeout(introDeadline);
-      originalMaterials.forEach((original, material) => { material.opacity = original.opacity; material.transparent = original.transparent; material.needsUpdate = true; });
-      device.logo.visible = true;
-      world.remove(introLogo); introLogo.geometry.dispose(); introLogo.material.dispose(); introTexture.dispose();
-      document.body.classList.remove('intro-active');
-      sceneWrap.style.left = ''; sceneWrap.style.width = ''; sceneWrap.style.top = ''; sceneWrap.style.height = '';
-      skip.hidden = true; introActive = false;
-      camera.clearViewOffset();
-      resize(); updateDevice();
-      if (!options.reducedMotion) gsap.fromTo(['.hero-copy', '.hero-bottom', '.site-header'], { opacity: .1, y: 7 }, { opacity: 1, y: 0, duration: .45, clearProps: 'opacity,transform', stagger: .05 });
-      options.onIntroComplete();
-    };
-    skip.addEventListener('click', finishIntro, { once: true });
-    const stopOnScroll = () => { if (scrollY > 30) finishIntro(); };
-    window.addEventListener('scroll', stopOnScroll, { passive: true });
-    introTween = gsap.to(counter, {
-      value: 1, duration: 1.8, ease: 'none',
-      onUpdate() {
-        const t = .25 + .75 * Math.min(1, (performance.now() - introStarted) / 1800);
-        const progress = smooth(clamp((t - .22) / .78, 0, 1));
-        const stroke = clamp(t / .25, 0, 1);
-        const letters = clamp((t - .08) / .2, 0, 1);
-        const width = drawCanvas.width, height = drawCanvas.height, divide = Math.round(height * .69);
-        ctx.clearRect(0, 0, width, height);
-        ctx.globalAlpha = 1;
-        const revealWidth = Math.max(1, width * stroke);
-        ctx.drawImage(image, 0, divide, revealWidth, height - divide, 0, divide, revealWidth, height - divide);
-        ctx.globalAlpha = letters;
-        ctx.drawImage(image, 0, 0, width, divide, 0, 0, width, divide);
-        introTexture.needsUpdate = true;
-        const surface = smooth(clamp((t - .3) / .43, 0, 1));
-        originalMaterials.forEach((original, material) => material.opacity = original.opacity * surface);
-        const layout = smooth(clamp((t - .34) / .66, 0, 1));
-        const copyBottom = document.querySelector('.hero-copy')!.getBoundingClientRect().bottom;
-        const viewportWidth = mobile() ? innerWidth : innerWidth * (1 - layout * .36);
-        const viewportHeight = mobile() ? THREE.MathUtils.lerp(innerHeight, 390, layout) : innerHeight;
-        const viewportLeft = mobile() ? 0 : innerWidth * layout * .36;
-        const viewportTop = mobile() ? layout * Math.max(80, copyBottom + 15) : 0;
-        // Shift the projection inside one full-size canvas; resizing the drawing buffer each frame is expensive.
-        camera.setViewOffset(viewportWidth, viewportHeight, -viewportLeft, -viewportTop, host.clientWidth, host.clientHeight);
-        const finalCamera = heroPosition.clone();
-        const aspectScale = Math.max(1, 1.04 / camera.aspect);
-        finalCamera.multiplyScalar(mobile() ? Math.max(.88, aspectScale * .87) : aspectScale);
-        camera.position.set(0, 0, 9).lerp(finalCamera, progress);
-        target.set(0, .3 * progress, 0);
-        camera.lookAt(target);
-        introLogo.position.set(0, 0, 0).lerp(finalPosition, progress);
-        introLogo.quaternion.copy(startRotation).slerp(finalRotation, progress);
-        const initialScale = (2 * 9 * Math.tan(THREE.MathUtils.degToRad(34 / 2)) * (innerWidth / innerHeight) * (mobile() ? .7 : .36)) / logoWidth;
-        introLogo.scale.setScalar(THREE.MathUtils.lerp(initialScale, finalLogoScale, progress));
-        dirty = true;
-        if (t >= 1) finishIntro();
-      },
-      onComplete: finishIntro
-    });
-    introDeadline = setTimeout(finishIntro, 1900);
-  } else { document.documentElement.classList.remove('intro-pending'); updateDevice(); options.onIntroComplete(); }
-
-  document.body.classList.add('has-3d');
-  renderer.setAnimationLoop(render);
-  window.addEventListener('pagehide', event => {
-    if (event.persisted) return;
-    disposed = true; renderer.setAnimationLoop(null); resizeObserver.disconnect(); visibilityObserver.disconnect();
-    device.dispose(); ground.geometry.dispose(); (ground.material as THREE.Material).dispose(); renderer.dispose();
-  });
-  return {
-    setStory(next) {
-      if (introActive || paused) return;
-      gsap.to(state, { ...next, duration: .35, ease: 'power2.out', overwrite: 'auto', onUpdate: updateDevice });
-    },
-    setSensor(sensor) {
-      selectedSensor = sensor === 'thermal' ? 'temperature' : sensor;
-      const focus = { focusX: sensor === 'thermal' ? -1.35 : sensor === 'eda' ? .9 : .25, focusZoom: sensor === 'thermal' ? .9 : 1 };
-      if (!introActive) {
-        if (paused) { state.sensor = 1; Object.assign(state, focus); updateDevice(); }
-        else gsap.to(state, { ...focus, duration: .65, ease: 'power2.inOut', overwrite: 'auto', onUpdate: updateDevice });
-      }
-    },
-    setView(view, instant) {
-      finishIntro();
-      const next = { open: view === 'assembled' ? 0 : 1, explode: view === 'exploded' ? 1 : 0, sensor: 0 };
-      gsap.killTweensOf(state);
-      if (instant) { Object.assign(state, next); updateDevice(); }
-      else gsap.to(state, { ...next, duration: .85, ease: 'power2.inOut', onUpdate: updateDevice });
-    },
-    setPaused(value) {
-      paused = value;
-      if (value) { finishIntro(); gsap.killTweensOf(state); state.pointerX = state.pointerY = 0; updateDevice(); }
+  function tick(time: number) {
+    frame = 0;
+    if (disposed || !visible || document.hidden) { lastTime = 0; return; }
+    const gap = lastTime ? time - lastTime : 16;
+    const alpha = paused ? 1 : 1 - Math.exp(-Math.min(gap, 50) / 70);
+    let moving = false, changed = false;
+    for (const key of Object.keys(target) as (keyof typeof target)[]) {
+      const delta = target[key] - current[key];
+      changed ||= delta !== 0;
+      if (Math.abs(delta) > .0008) { current[key] += delta * alpha; moving = true; }
+      else current[key] = target[key];
     }
+    if (changed || selectionDirty) { updateDevice(); dirty = true; }
+    if (dirty) {
+      const start = performance.now(); draw();
+      if (mobile && moving && frames > 20 && gap < 150 && qualityChanges < 3) samples.push({ gap, cost: performance.now() - start });
+      if (samples.length >= 60 && qualityChanges < 3) {
+        const gaps = samples.map(s => s.gap).sort((a, b) => a - b);
+        const meanCost = samples.reduce((sum, s) => sum + s.cost, 0) / samples.length;
+        const next = gaps[45] > 26 || meanCost > 14 ? Math.max(.65, pixelRatio - .15) : gaps[45] < 19 && meanCost < 5 ? Math.min(1, devicePixelRatio, pixelRatio + .1) : pixelRatio;
+        host.dataset.measuredFrameP75 = gaps[45].toFixed(1);
+        host.dataset.measuredRenderMs = meanCost.toFixed(1);
+        if (Math.abs(next - pixelRatio) > .01) { pixelRatio = next; renderer.setPixelRatio(pixelRatio); dirty = true; qualityChanges++; }
+        samples.length = 0;
+      }
+    }
+    lastTime = moving ? time : 0;
+    if (inspection && !moving) {
+      host.dataset.pickPoints = JSON.stringify(Object.fromEntries(proxies.map(proxy => {
+        proxy.getWorldPosition(point); point.project(camera);
+        return [proxy.userData.partKey, { x: (point.x + 1) * width / 2, y: (1 - point.y) * height / 2 }];
+      })));
+    }
+    if (moving || dirty) schedule();
+  }
+  function resize(w: number, h: number, isMobile: boolean) {
+    width = Math.round(w); height = Math.round(h); mobile = isMobile;
+    renderer.shadowMap.enabled = !mobile; key.castShadow = !mobile;
+    if (mobile && pixelRatio > 1) { pixelRatio = .85; renderer.setPixelRatio(pixelRatio); }
+    renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix();
+    positionCamera(); updateLabels(); invalidate();
+  }
+  let down: { x: number; y: number; scroll: number; pointer: number; moved: boolean } | null = null;
+  const canvas = renderer.domElement;
+  canvas.addEventListener('pointerdown', event => {
+    if (event.button !== 0) return;
+    down = { x: event.clientX, y: event.clientY, scroll: scrollY, pointer: event.pointerId, moved: false };
+    if (expanded) canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (!down || down.pointer !== event.pointerId) return;
+    const dx = event.clientX - down.x, dy = event.clientY - down.y;
+    if (Math.hypot(dx, dy) > 9) down.moved = true;
+    if (expanded && down.moved) {
+      target.yaw += dx * .008; target.pitch = THREE.MathUtils.clamp(target.pitch + dy * .006, -.55, .6);
+      down.x = event.clientX; down.y = event.clientY; invalidate();
+    }
+  });
+  canvas.addEventListener('pointercancel', () => { down = null; });
+  canvas.addEventListener('pointerup', event => {
+    if (!down) return;
+    const tap = !down.moved && Math.hypot(event.clientX - down.x, event.clientY - down.y) < 9 && Math.abs(scrollY - down.scroll) < 8;
+    down = null;
+    if (!tap) return;
+    if (current.dock > .95 && !expanded) { options.onExpand(); return; }
+    const rect = canvas.getBoundingClientRect();
+    pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
+    camera.updateMatrixWorld();
+    raycaster.setFromCamera(pointer, camera);
+    const allowed = proxies.filter(p => current.open > .55 || p.userData.partKey === 'temperature');
+    const hit = raycaster.intersectObjects(allowed, false)[0];
+    if (hit) options.onSelect(hit.object.userData.partKey as ComponentKey);
+  });
+  const onVisibility = () => {
+    if (document.hidden) { if (frame) cancelAnimationFrame(frame); frame = 0; lastTime = 0; }
+    else invalidate();
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  canvas.addEventListener('webglcontextlost', event => { event.preventDefault(); dispose(); options.onFailure(); });
+
+  function dispose() {
+    if (disposed) return;
+    disposed = true; cancelAnimationFrame(frame); frame = 0;
+    document.removeEventListener('visibilitychange', onVisibility);
+    proxies.forEach(p => { p.removeFromParent(); p.geometry.dispose(); (p.material as THREE.Material).dispose(); });
+    device.dispose(); ground.geometry.dispose(); (ground.material as THREE.Material).dispose(); shadowTexture.dispose(); logoTexture.dispose(); key.shadow.dispose(); renderer.dispose();
+  }
+  resize(host.clientWidth, host.clientHeight, mobile); updateDevice();
+  try {
+    await renderer.compileAsync(world, camera);
+    if (disposed) throw new Error('The graphics context was lost during preparation.');
+    draw(); initialized = true;
+  } catch (error) { dispose(); renderer.domElement.remove(); throw error; }
+  host.dataset.ready = 'true';
+  return {
+    resize,
+    setStory(next, instant = false) {
+      if (Object.entries(next).every(([key, value]) => target[key as keyof StoryState] === value) && !instant) return;
+      Object.assign(target, next);
+      if (instant || paused) { Object.assign(current, target); updateDevice(); }
+      invalidate();
+    },
+    select(part) { if (part === selection) return; selection = part; selectionDirty = true; invalidate(); },
+    setPaused(value) { paused = value; if (value) { Object.assign(current, target); updateDevice(); } invalidate(); },
+    setVisible(value) { visible = value; if (value) invalidate(); else { cancelAnimationFrame(frame); frame = 0; lastTime = 0; } },
+    setExpanded(value) { expanded = value; target.viewer = value ? 1 : 0; target.yaw = target.pitch = 0; canvas.style.touchAction = value ? 'none' : 'pan-y'; selectionDirty = true; invalidate(); },
+    setIntro(value) { intro = value; device.logo.visible = value === 1; positionCamera(); dirty = true; schedule(); },
+    projectLogo() {
+      device.group.updateMatrixWorld(true); camera.updateMatrixWorld();
+      const geometry = device.logo.geometry as THREE.PlaneGeometry;
+      const w = geometry.parameters.width / 2, h = geometry.parameters.height / 2;
+      return [[-w, h], [w, h], [w, -h], [-w, -h]].map(([x, y]) => {
+        point.set(x, y, 0).applyMatrix4(device.logo.matrixWorld).project(camera);
+        return { x: (point.x + 1) * width / 2, y: (1 - point.y) * height / 2 };
+      });
+    },
+    capturePart(part) {
+      const priorPosition = camera.position.clone(), priorRotation = camera.quaternion.clone();
+      const visibility = new Map<THREE.Object3D, boolean>();
+      const selectedObjects = new Set<THREE.Object3D>();
+      device.parts[part].traverse(object => selectedObjects.add(object));
+      device.group.traverse(object => {
+        if (object instanceof THREE.Mesh) { visibility.set(object, object.visible); object.visible = selectedObjects.has(object); }
+      });
+      ground.visible = false;
+      const bounds = new THREE.Box3().setFromObject(device.parts[part]);
+      const center = bounds.getCenter(new THREE.Vector3());
+      const size = Math.max(.7, bounds.getSize(new THREE.Vector3()).length());
+      camera.position.copy(center).add(new THREE.Vector3(1.1, 1.8, 2).normalize().multiplyScalar(size * 2.4)); camera.lookAt(center);
+      renderer.render(world, camera); const image = canvas.toDataURL('image/webp', .85);
+      visibility.forEach((value, object) => object.visible = value); ground.visible = true;
+      camera.position.copy(priorPosition); camera.quaternion.copy(priorRotation); draw(); return image;
+    },
+    dispose
   };
 }

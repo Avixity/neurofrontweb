@@ -1,0 +1,257 @@
+{
+  "before": {
+    "label": "final-before",
+    "reference": "d819d56",
+    "mobile": false,
+    "node": "v22.17.0",
+    "cpu": "Intel(R) Core(TM) i3-1005G1 CPU @ 1.20GHz",
+    "method": "CPU-only Node test; stubbed canvas/image loading; 300 warm-up updates then six timed batches. CPU time excludes scheduler waiting. No rendering or FPS measurement.",
+    "buildWallMs": {
+      "median": 135.23829999999998,
+      "p95": 174.13760000000002,
+      "mean": 137.68548
+    },
+    "buildCpuMs": {
+      "median": 297,
+      "p95": 344,
+      "mean": 300.2
+    },
+    "geometry": {
+      "meshes": 85,
+      "triangles": 38282,
+      "instances": 261,
+      "vertices": 78809
+    },
+    "cases": {
+      "moving": {
+        "updates": 3600,
+        "callWallMs": {
+          "median": 1.2187000000003536,
+          "p95": 2.1691000000000713,
+          "mean": 1.3404362499999973
+        },
+        "batchWallMsPerUpdate": {
+          "median": 1.337237333333334,
+          "p95": 1.445282333333333,
+          "mean": 1.3419522222222227
+        },
+        "batchCpuMsPerUpdate": {
+          "median": 1.3533333333333333,
+          "p95": 1.4316666666666666,
+          "mean": 1.288888888888889
+        }
+      },
+      "stationary": {
+        "updates": 30000,
+        "callWallMs": {
+          "median": 0.0042000000012194505,
+          "p95": 0.007999999999810825,
+          "mean": 0.005517376666663373
+        },
+        "batchWallMsPerUpdate": {
+          "median": 0.005673019999999815,
+          "p95": 0.006686479999999937,
+          "mean": 0.005728969999999965
+        },
+        "batchCpuMsPerUpdate": {
+          "median": 0.0064,
+          "p95": 0.0094,
+          "mean": 0.006266666666666666
+        }
+      },
+      "highlight": {
+        "updates": 30000,
+        "callWallMs": {
+          "median": 0.005600000000413274,
+          "p95": 0.007100000000718865,
+          "mean": 0.007187340000005497
+        },
+        "batchWallMsPerUpdate": {
+          "median": 0.0066073400000001125,
+          "p95": 0.013489060000000245,
+          "mean": 0.007476370000000073
+        },
+        "batchCpuMsPerUpdate": {
+          "median": 0.0064,
+          "p95": 0.0156,
+          "mean": 0.007299999999999998
+        }
+      }
+    },
+    "runtimeCallsIn120MovingUpdates": {
+      "frenet": 1200,
+      "bounds": 2400,
+      "normals": 0
+    }
+  },
+  "desktop": {
+    "label": "final-desktop",
+    "reference": "working-tree",
+    "mobile": false,
+    "node": "v22.17.0",
+    "cpu": "Intel(R) Core(TM) i3-1005G1 CPU @ 1.20GHz",
+    "method": "CPU-only Node test; stubbed canvas/image loading; 300 warm-up updates then six timed batches. CPU time excludes scheduler waiting. No rendering or FPS measurement.",
+    "buildWallMs": {
+      "median": 121.47259999999983,
+      "p95": 141.32330000000002,
+      "mean": 121.46621999999998
+    },
+    "buildCpuMs": {
+      "median": 234,
+      "p95": 343,
+      "mean": 256
+    },
+    "geometry": {
+      "meshes": 85,
+      "triangles": 38314,
+      "instances": 261,
+      "vertices": 78905
+    },
+    "cases": {
+      "moving": {
+        "updates": 3600,
+        "callWallMs": {
+          "median": 0.04309999999986758,
+          "p95": 0.09729999999990468,
+          "mean": 0.05620772222222475
+        },
+        "batchWallMsPerUpdate": {
+          "median": 0.0587811666666668,
+          "p95": 0.08055849999999964,
+          "mean": 0.056934472222222254
+        },
+        "batchCpuMsPerUpdate": {
+          "median": 0.051666666666666666,
+          "p95": 0.18333333333333332,
+          "mean": 0.07388888888888889
+        }
+      },
+      "stationary": {
+        "updates": 30000,
+        "callWallMs": {
+          "median": 0.0001999999999497959,
+          "p95": 0.0003000000001520675,
+          "mean": 0.0002048899999990681
+        },
+        "batchWallMsPerUpdate": {
+          "median": 0.0004054000000000087,
+          "p95": 0.0006254799999999705,
+          "mean": 0.00041437666666665796
+        },
+        "batchCpuMsPerUpdate": {
+          "median": 0,
+          "p95": 0,
+          "mean": 0
+        }
+      },
+      "highlight": {
+        "updates": 30000,
+        "callWallMs": {
+          "median": 0.0003999999998995918,
+          "p95": 0.0012000000001535227,
+          "mean": 0.0004917900000016289
+        },
+        "batchWallMsPerUpdate": {
+          "median": 0.0006128600000000006,
+          "p95": 0.001080320000000029,
+          "mean": 0.0006565600000000056
+        },
+        "batchCpuMsPerUpdate": {
+          "median": 0,
+          "p95": 0.0032,
+          "mean": 0.0005333333333333334
+        }
+      }
+    },
+    "runtimeCallsIn120MovingUpdates": {
+      "frenet": 0,
+      "bounds": 0,
+      "normals": 0
+    }
+  },
+  "mobile": {
+    "label": "final-mobile",
+    "reference": "working-tree",
+    "mobile": true,
+    "node": "v22.17.0",
+    "cpu": "Intel(R) Core(TM) i3-1005G1 CPU @ 1.20GHz",
+    "method": "CPU-only Node test; stubbed canvas/image loading; 300 warm-up updates then six timed batches. CPU time excludes scheduler waiting. No rendering or FPS measurement.",
+    "buildWallMs": {
+      "median": 90.38499999999999,
+      "p95": 109.54860000000008,
+      "mean": 92.46134000000006
+    },
+    "buildCpuMs": {
+      "median": 234,
+      "p95": 328,
+      "mean": 256.2
+    },
+    "geometry": {
+      "meshes": 85,
+      "triangles": 16234,
+      "instances": 171,
+      "vertices": 32991
+    },
+    "cases": {
+      "moving": {
+        "updates": 3600,
+        "callWallMs": {
+          "median": 0.020300000000133878,
+          "p95": 0.04469999999992069,
+          "mean": 0.023841222222217386
+        },
+        "batchWallMsPerUpdate": {
+          "median": 0.023293500000000526,
+          "p95": 0.03370866666666643,
+          "mean": 0.02432327777777775
+        },
+        "batchCpuMsPerUpdate": {
+          "median": 0.02666666666666667,
+          "p95": 0.051666666666666666,
+          "mean": 0.03027777777777778
+        }
+      },
+      "stationary": {
+        "updates": 30000,
+        "callWallMs": {
+          "median": 0.00010000000020227162,
+          "p95": 0.0003000000001520675,
+          "mean": 0.00016205999999992855
+        },
+        "batchWallMsPerUpdate": {
+          "median": 0.00029861999999993715,
+          "p95": 0.0005516599999999926,
+          "mean": 0.00032015333333332215
+        },
+        "batchCpuMsPerUpdate": {
+          "median": 0,
+          "p95": 0.0124,
+          "mean": 0.0020666666666666667
+        }
+      },
+      "highlight": {
+        "updates": 30000,
+        "callWallMs": {
+          "median": 0.0003999999998995918,
+          "p95": 0.0011999999996987754,
+          "mean": 0.00047182666666869107
+        },
+        "batchWallMsPerUpdate": {
+          "median": 0.0006310199999999895,
+          "p95": 0.0009979400000000168,
+          "mean": 0.0006250666666666651
+        },
+        "batchCpuMsPerUpdate": {
+          "median": 0,
+          "p95": 0.0032,
+          "mean": 0.0010333333333333334
+        }
+      }
+    },
+    "runtimeCallsIn120MovingUpdates": {
+      "frenet": 0,
+      "bounds": 0,
+      "normals": 0
+    }
+  }
+}

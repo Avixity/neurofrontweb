@@ -1,0 +1,49 @@
+.dashboard-screenshot {
+  margin: 0;
+}
+
+.dashboard-screenshot-media {
+  display: block;
+  overflow: hidden;
+  border: 1px solid #435047;
+  background: #091018;
+}
+
+.dashboard-screenshot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.dashboard-screenshot figcaption {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 28px;
+  padding-top: 20px;
+}
+
+.dashboard-screenshot figcaption > span {
+  flex: 0 0 auto;
+  max-width: 100%;
+  color: #dce7dd;
+  font: 12px/1.6 var(--mono);
+  letter-spacing: .02em;
+}
+
+.dashboard-screenshot figcaption p {
+  max-width: 580px;
+  margin: 0;
+  color: #b8c4b9;
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+@media (max-width: 760px) {
+  .dashboard-screenshot figcaption {
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 16px;
+  }
+}

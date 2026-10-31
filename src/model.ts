@@ -2,6 +2,10 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+export const SELECTABLE_PARTS = ['ad8232', 'esp32', 'gsr', 'temperature', 'battery', 'charger'] as const;
+export type DevicePartKey = typeof SELECTABLE_PARTS[number];
+export interface DeviceOptions { mobile?: boolean }
+
 export interface DeviceModel {
   group: THREE.Group;
   controller: THREE.Group;
@@ -52,8 +56,8 @@ function printedTexture(width: number, height: number, draw: (ctx: CanvasRenderi
   return texture;
 }
 
-function bandGeometry(rx: number, rz: number, height: number, thickness: number, start = 0, arc = Math.PI * 2) {
-  const steps = Math.ceil(96 * arc / (Math.PI * 2));
+function bandGeometry(rx: number, rz: number, height: number, thickness: number, start = 0, arc = Math.PI * 2, resolution = 96) {
+  const steps = Math.max(2, Math.ceil(resolution * arc / (Math.PI * 2)));
   const bevel = Math.min(thickness * 0.32, 0.022);
   const section = [
     [-thickness / 2, -height / 2 + bevel], [-thickness / 2 + bevel, -height / 2],
@@ -82,9 +86,13 @@ function bandGeometry(rx: number, rz: number, height: number, thickness: number,
   return geometry;
 }
 
-export function buildDevice(): DeviceModel {
+export function buildDevice({ mobile = false }: DeviceOptions = {}): DeviceModel {
+  const detail = mobile
+    ? { boxSegments: 1, bandSegments: 56, cableSegments: 48, cableSides: 6, spiralSegments: 260, spiralTurns: 36, stitches: 48, wireSides: 4, wirePoses: 3 }
+    : { boxSegments: 2, bandSegments: 96, cableSegments: 90, cableSides: 8, spiralSegments: 650, spiralTurns: 49, stitches: 96, wireSides: 6, wirePoses: 3 };
   const group = new THREE.Group();
   group.name = 'NeuroFront — current wired prototype';
+  group.userData.quality = mobile ? 'mobile' : 'desktop';
   const controller = new THREE.Group();
   controller.name = 'Controller enclosure';
   controller.position.set(1.28, 0, 0);
@@ -132,14 +140,14 @@ export function buildDevice(): DeviceModel {
     return object;
   }
   function box(parent: THREE.Object3D, size: Point, position: Point, material: THREE.Material, radius = 0.015) {
-    return mesh(parent, new RoundedBoxGeometry(...size, 2, Math.min(radius, ...size.map(n => n / 3))), material, position);
+    return mesh(parent, new RoundedBoxGeometry(...size, detail.boxSegments, Math.min(radius, ...size.map(n => n / 3))), material, position);
   }
   function cylinder(parent: THREE.Object3D, radius: number, length: number, position: Point, material: THREE.Material, segments = 16) {
-    return mesh(parent, new THREE.CylinderGeometry(radius, radius, length, segments), material, position);
+    return mesh(parent, new THREE.CylinderGeometry(radius, radius, length, mobile ? Math.min(segments, 12) : segments), material, position);
   }
   function line(parent: THREE.Object3D, points: Point[], material: THREE.Material, radius = 0.013, segments = 28) {
     const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p)));
-    return mesh(parent, new THREE.TubeGeometry(curve, segments, radius, 6, false), material);
+    return mesh(parent, new THREE.TubeGeometry(curve, mobile ? Math.max(4, Math.ceil(segments * 0.6)) : segments, radius, detail.wireSides, false), material);
   }
   function plane(parent: THREE.Object3D, width: number, height: number, position: Point, texture: THREE.Texture, opacity = 1) {
     const material = new THREE.MeshStandardMaterial({ map: texture, transparent: true, opacity, roughness: 0.65, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
@@ -229,6 +237,8 @@ export function buildDevice(): DeviceModel {
   function part(name: string, position: Point, parent: THREE.Group = controller) {
     const value = new THREE.Group();
     value.name = name;
+    value.userData.partKey = name;
+    value.userData.selectable = (SELECTABLE_PARTS as readonly string[]).includes(name);
     value.position.set(...position);
     parent.add(value);
     parts[name] = value;
@@ -242,7 +252,7 @@ export function buildDevice(): DeviceModel {
     box(parent, [width, 0.035, depth], [0, 0, 0], boardMaterial, 0.027);
     for (const x of [-width / 2 + 0.065, width / 2 - 0.065]) {
       for (const z of [-depth / 2 + 0.065, depth / 2 - 0.065]) {
-        const ring = mesh(parent, new THREE.TorusGeometry(0.025, 0.006, 5, 10), gold, [x, 0.02, z]);
+        const ring = mesh(parent, new THREE.TorusGeometry(0.025, 0.006, mobile ? 3 : 5, mobile ? 8 : 10), gold, [x, 0.02, z]);
         ring.rotation.x = Math.PI / 2;
       }
     }
@@ -250,6 +260,7 @@ export function buildDevice(): DeviceModel {
   function passives(parent: THREE.Group, count: number, xStart: number, zStart: number, step: number) {
     const bodies: Point[] = [], contacts: Point[] = [];
     for (let i = 0; i < count; i++) {
+      if (mobile && i % 2 === 1) continue;
       const x = xStart + i % 4 * step;
       const z = zStart + Math.floor(i / 4) * step;
       bodies.push([x, 0.045, z]);
@@ -381,12 +392,18 @@ export function buildDevice(): DeviceModel {
     endAnchor: THREE.Vector3;
     radius: number;
     segments: number;
+    positionPoses: Float32Array[];
+    normalPoses: Float32Array[];
+    startPoses: THREE.Vector3[];
+    endPoses: THREE.Vector3[];
+    vertexWeights: Float32Array;
   }> = [];
   function flexibleWire(parent: THREE.Object3D, points: Point[], material: THREE.Material, startPart: string, endPart: string | null, radius = 0.018, segments = 24) {
+    segments = mobile ? Math.max(10, Math.round(segments * 0.58)) : segments;
     const vectors = points.map(p => new THREE.Vector3(...p));
     const curve = new THREE.CatmullRomCurve3(vectors.map(p => p.clone()));
     curve.arcLengthDivisions = 48;
-    const geometry = new THREE.TubeGeometry(curve, segments, radius, 6, false);
+    const geometry = new THREE.TubeGeometry(curve, segments, radius, detail.wireSides, false);
     (geometry.attributes.position as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
     (geometry.attributes.normal as THREE.BufferAttribute).setUsage(THREE.DynamicDrawUsage);
     const object = new THREE.Mesh(geometry, material);
@@ -394,10 +411,13 @@ export function buildDevice(): DeviceModel {
     object.frustumCulled = false;
     object.userData.flexible = true;
     parent.add(object);
+    const vertexWeights = new Float32Array(geometry.attributes.position.count);
+    for (let i = 0; i < vertexWeights.length; i++) vertexWeights[i] = Math.floor(i / (detail.wireSides + 1)) / segments;
     flexibleWires.push({
       object, curve, points: vectors, startPart, endPart, radius, segments,
       startAnchor: vectors[0].clone().sub(homes[startPart]),
       endAnchor: endPart ? vectors.at(-1)!.clone().sub(homes[endPart]) : vectors.at(-1)!.clone(),
+      positionPoses: [], normalPoses: [], startPoses: [], endPoses: [], vertexWeights,
     });
   }
   const wireColors = ['#d0b346', '#8a6fac', '#6e9b86', '#d1d0bd', '#282e32', '#ab4f48'];
@@ -413,7 +433,7 @@ export function buildDevice(): DeviceModel {
   const wireConnections = [['ad8232', 'charger'], ['ad8232', 'esp32'], ['ad8232', 'esp32'], ['esp32', 'charger'], ['battery', 'charger'], ['battery', 'charger'], ['gsr', 'esp32']];
   harnessPaths.forEach((points, i) => flexibleWire(wireHarness, points, standard(wireColors[i % wireColors.length], 0.48), ...wireConnections[i] as [string, string]));
 
-  mesh(headband, bandGeometry(1.14, 0.87, 0.42, 0.105), fabric);
+  mesh(headband, bandGeometry(1.14, 0.87, 0.42, 0.105, 0, Math.PI * 2, detail.bandSegments), fabric);
   for (const y of [-0.19, 0.19]) {
     const points: Point[] = Array.from({ length: 81 }, (_, i) => {
       const a = i / 80 * Math.PI * 2;
@@ -421,16 +441,16 @@ export function buildDevice(): DeviceModel {
     });
     line(headband, points, fabric, 0.018, 80);
   }
-  mesh(headband, bandGeometry(1.143, 0.872, 0.40, 0.118, Math.PI * 1.24, Math.PI * 0.54), tape);
+  mesh(headband, bandGeometry(1.143, 0.872, 0.40, 0.118, Math.PI * 1.24, Math.PI * 0.54, detail.bandSegments), tape);
   for (const a of [0.14, Math.PI - 0.14]) {
-    const tie = mesh(headband, bandGeometry(1.156, 0.886, 0.45, 0.13, a - 0.026, 0.052), rubber);
+    const tie = mesh(headband, bandGeometry(1.156, 0.886, 0.45, 0.13, a - 0.026, 0.052, detail.bandSegments), rubber);
     tie.name = 'Cable tie securing the fabric';
     box(headband, [0.07, 0.13, 0.12], [1.17 * Math.cos(a), -0.14, 0.89 * Math.sin(a)], rubber, 0.018);
   }
   const stitchMat = standard('#515957', 0.99);
   const stitches: Point[] = [];
-  for (let i = 0; i < 96; i++) {
-    const a = i / 96 * Math.PI * 2;
+  for (let i = 0; i < detail.stitches; i++) {
+    const a = i / detail.stitches * Math.PI * 2;
     stitches.push([1.2 * Math.cos(a), 0.14, 0.93 * Math.sin(a)]);
   }
   pins(headband, stitches, [0.013, 0.018, 0.013], stitchMat);
@@ -451,7 +471,7 @@ export function buildDevice(): DeviceModel {
   const temperature = part('temperature', [0.04, -0.055, -0.735], headband);
   const thermoMaterial = standard('#464139', 0.37);
   highlightMaterials.temperature.push(thermoMaterial);
-  const bead = mesh(temperature, new THREE.SphereGeometry(0.063, 16, 10), thermoMaterial);
+  const bead = mesh(temperature, new THREE.SphereGeometry(0.063, mobile ? 12 : 16, mobile ? 8 : 10), thermoMaterial);
   bead.scale.set(0.8, 1, 0.65);
   line(temperature, [[-0.022, 0, 0], [-0.022, -0.10, -0.02], [-0.09, -0.15, -0.03]], silver, 0.007, 12);
   line(temperature, [[0.022, 0, 0], [0.022, -0.10, -0.02], [0.08, -0.15, -0.03]], silver, 0.007, 12);
@@ -464,19 +484,20 @@ export function buildDevice(): DeviceModel {
     new THREE.Vector3(-0.25, 0.09, 1.39), new THREE.Vector3(0.38, 0.10, 1.33),
     new THREE.Vector3(0.40, 0.21, 0.81), new THREE.Vector3(-0.10, 0.33, 0.44),
   ]);
-  mesh(group, new THREE.TubeGeometry(cableCurve, 90, 0.038, 8, false), whiteWire).name = 'Wired connection to controller';
-  const frames = cableCurve.computeFrenetFrames(480, false);
+  mesh(group, new THREE.TubeGeometry(cableCurve, detail.cableSegments, 0.038, detail.cableSides, false), whiteWire).name = 'Wired connection to controller';
+  const spiralSteps = mobile ? 260 : 480;
+  const frames = cableCurve.computeFrenetFrames(spiralSteps, false);
   const spiralPoints: THREE.Vector3[] = [];
-  for (let i = 0; i <= 480; i++) {
-    const t = i / 480;
-    const angle = t * Math.PI * 2 * 49;
+  for (let i = 0; i <= spiralSteps; i++) {
+    const t = i / spiralSteps;
+    const angle = t * Math.PI * 2 * detail.spiralTurns;
     const point = cableCurve.getPointAt(t);
     point.addScaledVector(frames.normals[i], Math.cos(angle) * 0.045);
     point.addScaledVector(frames.binormals[i], Math.sin(angle) * 0.045);
     spiralPoints.push(point);
   }
   const spiralCurve = new THREE.CatmullRomCurve3(spiralPoints);
-  mesh(group, new THREE.TubeGeometry(spiralCurve, 650, 0.012, 4, false), standard('#bdc2bf', 0.56)).name = 'Spiral cable wrap';
+  mesh(group, new THREE.TubeGeometry(spiralCurve, detail.spiralSegments, 0.012, mobile ? 3 : 4, false), standard('#bdc2bf', 0.56)).name = 'Spiral cable wrap';
   line(group, [[-0.10, 0.33, 0.44], [-0.03, 0.33, 0.44]], blackWire, 0.055, 4);
 
   // Merge static detail meshes per material within each independently animated part.
@@ -506,24 +527,36 @@ export function buildDevice(): DeviceModel {
     }
   }
   [controller, lid, headband, esp, ad, battery, charger, gsr, temperature, wireHarness].forEach(batchStatic);
+  SELECTABLE_PARTS.forEach(key => parts[key].traverse(object => { object.userData.partKey = key; }));
 
   const explodeOffsets: Record<string, Point> = {
     esp32: [0.38, 1.02, 0.31], ad8232: [-0.33, 0.73, 0.38],
     battery: [-0.36, 0.98, -0.14], charger: [0.37, 0.68, -0.26],
     gsr: [0.02, 1.45, -0.03], electrode: [0, 0.32, 0.19], temperature: [0, 0.48, 0.13],
   };
-  let lastExploded = -1;
+  const partEntries = Object.entries(parts);
   const startDelta = new THREE.Vector3(), endDelta = new THREE.Vector3();
   const wirePoint = new THREE.Vector3(), wireNormal = new THREE.Vector3();
-  function deformWires(exploded: number) {
-    if (Math.abs(lastExploded - exploded) < 0.00001) return;
-    lastExploded = exploded;
-    Object.values(parts).forEach(item => item.updateMatrix());
+  function placeParts(exploded: number) {
+    for (const [key, item] of partEntries) {
+      const offset = explodeOffsets[key];
+      item.position.set(homes[key].x + offset[0] * exploded, homes[key].y + offset[1] * exploded, homes[key].z + offset[2] * exploded);
+      item.rotation.y = (key === 'ad8232' ? -0.12 : key === 'esp32' ? 0.10 : 0) * exploded;
+      item.updateMatrix();
+    }
+  }
+
+  // Curve frames are calculated only at construction. Animation blends these buffers.
+  for (let pose = 0; pose < detail.wirePoses; pose++) {
+    const exploded = pose / (detail.wirePoses - 1);
+    placeParts(exploded);
     for (const wire of flexibleWires) {
       startDelta.copy(wire.startAnchor).applyMatrix4(parts[wire.startPart].matrix).sub(wire.points[0]);
       endDelta.copy(wire.endAnchor);
       if (wire.endPart) endDelta.applyMatrix4(parts[wire.endPart].matrix);
       endDelta.sub(wire.points.at(-1)!);
+      wire.startPoses.push(wire.points[0].clone().add(startDelta));
+      wire.endPoses.push(wire.points.at(-1)!.clone().add(endDelta));
       wire.curve.points.forEach((point, i) => {
         const t = i / (wire.points.length - 1);
         point.copy(wire.points[i]).addScaledVector(startDelta, 1 - t).addScaledVector(endDelta, t);
@@ -531,41 +564,98 @@ export function buildDevice(): DeviceModel {
       });
       wire.curve.updateArcLengths();
       const wireFrames = wire.curve.computeFrenetFrames(wire.segments, false);
-      const positions = wire.object.geometry.attributes.position;
-      const normals = wire.object.geometry.attributes.normal;
-      for (let i = 0; i <= wire.segments; i++) {
-        wire.curve.getPointAt(i / wire.segments, wirePoint);
-        for (let j = 0; j <= 6; j++) {
-          const angle = j / 6 * Math.PI * 2;
-          wireNormal.copy(wireFrames.normals[i]).multiplyScalar(-Math.cos(angle)).addScaledVector(wireFrames.binormals[i], Math.sin(angle));
-          const index = i * 7 + j;
-          positions.setXYZ(index, wirePoint.x + wireNormal.x * wire.radius, wirePoint.y + wireNormal.y * wire.radius, wirePoint.z + wireNormal.z * wire.radius);
-          normals.setXYZ(index, wireNormal.x, wireNormal.y, wireNormal.z);
+      if (pose > 0) {
+        const previous = wire.normalPoses[pose - 1];
+        const reference = new THREE.Vector3(-previous[0], -previous[1], -previous[2]);
+        reference.addScaledVector(wireFrames.tangents[0], -reference.dot(wireFrames.tangents[0])).normalize();
+        const angle = Math.atan2(reference.dot(wireFrames.binormals[0]), reference.dot(wireFrames.normals[0]));
+        const cosine = Math.cos(angle), sine = Math.sin(angle);
+        for (let i = 0; i <= wire.segments; i++) {
+          wireNormal.copy(wireFrames.normals[i]);
+          wireFrames.normals[i].multiplyScalar(cosine).addScaledVector(wireFrames.binormals[i], sine);
+          wireFrames.binormals[i].multiplyScalar(cosine).addScaledVector(wireNormal, -sine);
         }
       }
-      positions.needsUpdate = normals.needsUpdate = true;
-      wire.object.geometry.computeBoundingSphere();
-      wire.object.geometry.computeBoundingBox();
+      const positions = new Float32Array(wire.object.geometry.attributes.position.array.length);
+      const normals = new Float32Array(positions.length);
+      for (let i = 0; i <= wire.segments; i++) {
+        wire.curve.getPointAt(i / wire.segments, wirePoint);
+        for (let j = 0; j <= detail.wireSides; j++) {
+          const angle = j / detail.wireSides * Math.PI * 2;
+          wireNormal.copy(wireFrames.normals[i]).multiplyScalar(-Math.cos(angle)).addScaledVector(wireFrames.binormals[i], Math.sin(angle));
+          const index = (i * (detail.wireSides + 1) + j) * 3;
+          positions[index] = wirePoint.x + wireNormal.x * wire.radius;
+          positions[index + 1] = wirePoint.y + wireNormal.y * wire.radius;
+          positions[index + 2] = wirePoint.z + wireNormal.z * wire.radius;
+          normals[index] = wireNormal.x;
+          normals[index + 1] = wireNormal.y;
+          normals[index + 2] = wireNormal.z;
+        }
+      }
+      wire.positionPoses.push(positions);
+      wire.normalPoses.push(normals);
     }
   }
+
+  for (const wire of flexibleWires) {
+    wire.object.geometry.boundingBox = new THREE.Box3(new THREE.Vector3(-3, -1, -3), new THREE.Vector3(3, 3, 3));
+    wire.object.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 1, 0), 5);
+  }
+  function deformWires(exploded: number) {
+    const progress = exploded * (detail.wirePoses - 1);
+    const lower = Math.min(Math.floor(progress), detail.wirePoses - 2);
+    const upper = lower + 1;
+    const blend = progress - lower;
+    for (const wire of flexibleWires) {
+      const positionAttribute = wire.object.geometry.attributes.position as THREE.BufferAttribute;
+      const normalAttribute = wire.object.geometry.attributes.normal as THREE.BufferAttribute;
+      const positions = positionAttribute.array as Float32Array;
+      const normals = normalAttribute.array as Float32Array;
+      const p0 = wire.positionPoses[lower], p1 = wire.positionPoses[upper];
+      const n0 = wire.normalPoses[lower], n1 = wire.normalPoses[upper];
+      // Correct the tiny rotation interpolation error at the two physical connections.
+      startDelta.copy(wire.startAnchor).applyMatrix4(parts[wire.startPart].matrix);
+      wirePoint.copy(wire.startPoses[lower]).lerp(wire.startPoses[upper], blend);
+      startDelta.sub(wirePoint);
+      endDelta.copy(wire.endAnchor);
+      if (wire.endPart) endDelta.applyMatrix4(parts[wire.endPart].matrix);
+      wirePoint.copy(wire.endPoses[lower]).lerp(wire.endPoses[upper], blend);
+      endDelta.sub(wirePoint);
+      for (let i = 0, vertex = 0; i < positions.length; i += 3, vertex++) {
+        const endWeight = wire.vertexWeights[vertex], startWeight = 1 - endWeight;
+        positions[i] = p0[i] + (p1[i] - p0[i]) * blend + startDelta.x * startWeight + endDelta.x * endWeight;
+        positions[i + 1] = p0[i + 1] + (p1[i + 1] - p0[i + 1]) * blend + startDelta.y * startWeight + endDelta.y * endWeight;
+        positions[i + 2] = p0[i + 2] + (p1[i + 2] - p0[i + 2]) * blend + startDelta.z * startWeight + endDelta.z * endWeight;
+        normals[i] = n0[i] + (n1[i] - n0[i]) * blend;
+        normals[i + 1] = n0[i + 1] + (n1[i + 1] - n0[i + 1]) * blend;
+        normals[i + 2] = n0[i + 2] + (n1[i + 2] - n0[i + 2]) * blend;
+      }
+      positionAttribute.needsUpdate = normalAttribute.needsUpdate = true;
+    }
+  }
+  let lastExploded = -1, lastOpened = -1;
+  let lastHighlight: string | undefined;
+  const highlightColor = new THREE.Color('#4da99b');
   function animate(open: number, explode: number, highlight: string) {
+    if (disposed) return;
     const opened = THREE.MathUtils.clamp(open, 0, 1);
     const exploded = THREE.MathUtils.clamp(explode, 0, 1);
-    lid.rotation.x = -opened * 1.98;
-    for (const [key, item] of Object.entries(parts)) {
-      const offset = explodeOffsets[key];
-      item.position.copy(homes[key]);
-      item.position.x += offset[0] * exploded;
-      item.position.y += offset[1] * exploded;
-      item.position.z += offset[2] * exploded;
-      item.rotation.y = (key === 'ad8232' ? -0.12 : key === 'esp32' ? 0.10 : 0) * exploded;
-      const active = key === highlight || highlight === 'electrical' && (key === 'ad8232' || key === 'electrode') || highlight === 'eda' && key === 'gsr';
-      for (const material of highlightMaterials[key]) {
-        material.emissive.set(active ? '#4da99b' : '#000000');
-        material.emissiveIntensity = active ? 0.35 : 0;
-      }
+    if (opened !== lastOpened) { lid.rotation.x = -opened * 1.98; lastOpened = opened; }
+    if (exploded !== lastExploded) {
+      placeParts(exploded);
+      deformWires(exploded);
+      lastExploded = exploded;
     }
-    deformWires(exploded);
+    if (highlight !== lastHighlight) {
+      for (const [key] of partEntries) {
+        const active = key === highlight || highlight === 'electrical' && (key === 'ad8232' || key === 'electrode') || highlight === 'eda' && key === 'gsr';
+        for (const material of highlightMaterials[key]) {
+          material.emissive.copy(highlightColor);
+          material.emissiveIntensity = active ? 0.35 : 0;
+        }
+      }
+      lastHighlight = highlight;
+    }
   }
   animate(0, 0, '');
 
@@ -579,6 +669,9 @@ export function buildDevice(): DeviceModel {
     geometries.forEach(geometry => geometry.dispose());
     materials.forEach(material => material.dispose());
     textures.forEach(texture => texture.dispose());
+    flexibleWires.length = 0;
+    materials.clear();
+    textures.length = 0;
   }
   return { group, controller, headband, lid, parts, logo, animate, dispose };
 }

@@ -7,7 +7,7 @@ The website uses a procedural Three.js explanation of the current wired prototyp
 - Updated photographs **1, 2, 3, and 4** in the [primary NeuroFront Drive folder](https://drive.google.com/drive/folders/19Y8WWLh8sYoZmOehavQl_RRSuCdn6Ex8): photograph 1 shows the open black controller; 2 and 3 show the fabric band, electrode snaps, tape, clips, and white leads; 4 shows the closed lid and original NeuroFront mark.
 - Local `NeuroFront-CBSE-Expo-2026.mp4`: 114 seconds, 1920 × 1080, 24 fps. Contact sheets were extracted across the video, with half-second frames inspected from 20.5 to 33.5 seconds. The product reveal and lid movement informed the pacing; the actual photographs informed the physical construction.
 - Local component images `esp 32.png`, `ad8232.png`, `gsr sensor.png`, and `ntc10k.png` informed recognisable board, connector, and sensor details. The local `Control Unit.png` depicts an older clear enclosure and was superseded by the updated Drive photographs.
-- The lid uses the original supplied white logo, with its aspect ratio preserved.
+- The lid uses an SVG contour trace of the original supplied white logo, with its proportions preserved. The same traced paths form the animated opening.
 
 ## What is represented
 
@@ -25,6 +25,16 @@ Opening uses a hinge rotation. Exploding separates the boards and sensors; jumpe
 
 ## Implementation checks
 
-The model contains approximately 38,282 triangles, 85 mesh objects including instanced batches, and 261 small repeated instances. Those are static geometry counts, not measured frame-rate or total renderer draw-call claims.
+Desktop quality contains 38,314 triangles, 85 mesh objects including instanced batches, and 261 small repeated instances. Mobile quality contains 16,234 triangles and 171 repeated instances, retaining the same component groups. Those are static geometry counts, not measured frame-rate or total renderer draw-call claims.
 
-Numerical checks confirmed finite geometry attributes, correctly oriented inner/outer/top/bottom band normals, and restoration of the assembled bounds after opening/exploding and reversing. The first internal wire's two exploded endpoints matched their moving component anchors within 0.00000002 scene units. Geometry, materials, and textures have an idempotent disposal path. Browser appearance and performance are checked separately as part of the complete website.
+Numerical checks confirmed finite geometry attributes, correctly oriented inner/outer/top/bottom band normals, and restoration of the assembled geometry bounds after opening/exploding and reversing. Across 101 explosion positions, the first internal wire's endpoints matched their moving component anchors within 0.00000006 scene units in both quality levels. Unchanged animation states do not upload wire buffers again. Geometry, materials, textures and cached wire buffers have an idempotent disposal path. Browser appearance and performance are checked separately as part of the complete website.
+
+## Model API
+
+`buildDevice()` retains desktop quality; `buildDevice({ mobile: true })` reduces small bevels, cable subdivisions, stitching and passive-component detail. Both retain the fabric band, enclosure, connected leads, ports and individual electronics.
+
+`SELECTABLE_PARTS` exports the exact keys `ad8232`, `esp32`, `gsr`, `temperature`, `battery`, and `charger`. Each is available through `device.parts[key]`. Its group and descendant meshes carry `userData.partKey` for selection and interaction proxies. The extra `electrode` group is retained for the electrical-path highlight.
+
+Wire position and normal buffers are prepared at three explosion states during construction. Runtime animation blends adjacent buffers, with an endpoint correction for the boards' small rotations. Frenet frames, curve arc lengths, normals and geometry bounds are not recalculated during animation. Wire bounds are deliberately generous and frustum culling is disabled for those small meshes; use precise geometry bounds when measuring the whole assembly. Highlight materials update only when the selected key changes.
+
+The repeatable CPU benchmark and measured limitations are documented in [model-performance.md](model-performance.md).
