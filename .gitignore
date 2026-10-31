@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.work/
+.vercel/
+*.mp4
+*.log
+.env*
