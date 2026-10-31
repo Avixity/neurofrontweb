@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { buildDevice } from './model';
 import type { ComponentKey } from './components';
-import type { StoryState } from './story';
+import { poseAt, type StoryState } from './story';
 
 type Options = { mobile: boolean; reducedMotion: boolean; onFailure: () => void; onSelect: (part: ComponentKey) => void; onExpand: () => void };
 export interface DeviceScene {
@@ -62,7 +62,7 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
   const logoMaterial = device.logo.material as THREE.MeshBasicMaterial;
   logoMaterial.map = logoTexture; logoMaterial.needsUpdate = true;
 
-  const current = { open: 0, explode: 0, sensor: 0, dock: 0, yaw: 0, pitch: 0, viewer: 0 };
+  const current = { reveal: 0, sensor: 0, dock: 0, yaw: 0, pitch: 0, viewer: 0 };
   const target = { ...current };
   let selection: ComponentKey | null = null;
   let paused = options.reducedMotion, visible = true, expanded = false, disposed = false;
@@ -96,10 +96,12 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
   }
   function invalidate() { dirty = true; schedule(); }
   function positionCamera() {
-    cameraTarget.set(current.open * .22 + current.dock * .4, .3 + current.explode * .30, 0);
-    cameraDirection.set(5.4, 7.3 + current.open * 1.2, 9.4 - current.sensor * .5);
+    const pose = poseAt(current.reveal);
+    cameraTarget.set(pose.handoff * .22 + current.dock * .4, .3 + pose.explode * .30, 0);
+    cameraDirection.set(5.4, 7.3 + pose.handoff * 1.2, 9.4 - current.sensor * .5);
     cameraDirection.multiplyScalar(Math.max(.92, 1.04 / camera.aspect));
-    if (mobile) cameraDirection.multiplyScalar(.8 - current.viewer * .16 + current.explode * .08);
+    if (mobile) cameraDirection.multiplyScalar(.8 - current.viewer * .16 + pose.explode * .08);
+    cameraDirection.multiplyScalar(1 + pose.handoff * .035);
     cameraDirection.multiplyScalar(1 - current.dock * (mobile ? .25 : .30));
     cameraDirection.multiplyScalar(.78 + intro * .22);
     if (current.viewer > 0) {
@@ -111,7 +113,7 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
     camera.position.copy(cameraTarget).add(cameraDirection); camera.lookAt(cameraTarget);
   }
   function updateLabels() {
-    const showLabels = intro === 1 && current.explode > .6 && current.dock < .15 && !expanded;
+    const showLabels = intro === 1 && poseAt(current.reveal).explode > .6 && current.dock < .15 && !expanded;
     device.group.updateMatrixWorld(true);
     labels.forEach(label => {
       const name = label.dataset.part as ComponentKey;
@@ -126,10 +128,12 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
     });
   }
   function updateDevice() {
-    device.animate(current.open, current.explode, selection || '');
-    device.group.rotation.y = -.12 + current.open * .13 - current.sensor * .12;
+    const pose = poseAt(current.reveal);
+    device.animate(pose.open, pose.explode, selection || '');
+    device.group.rotation.y = -.12 + pose.handoff * .13 - current.sensor * .12;
     positionCamera(); updateLabels(); selectionDirty = false;
-    host.dataset.open = current.open.toFixed(2); host.dataset.explode = current.explode.toFixed(2);
+    host.dataset.open = pose.open.toFixed(2); host.dataset.explode = pose.explode.toFixed(2);
+    host.dataset.handoff = pose.handoff.toFixed(2); host.dataset.reveal = current.reveal.toFixed(4);
     host.dataset.sensor = selection || ''; host.dataset.dock = current.dock.toFixed(2);
   }
   function draw() {
@@ -195,7 +199,7 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
     const dx = event.clientX - down.x, dy = event.clientY - down.y;
     if (Math.hypot(dx, dy) > 9) down.moved = true;
     if (expanded && down.moved) {
-      target.yaw += dx * .008; target.pitch = THREE.MathUtils.clamp(target.pitch + dy * .006, -.55, .6);
+      target.yaw -= dx * .008; target.pitch = THREE.MathUtils.clamp(target.pitch - dy * .006, -.55, .6);
       down.x = event.clientX; down.y = event.clientY; invalidate();
     }
   });
@@ -210,7 +214,7 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
     pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1);
     camera.updateMatrixWorld();
     raycaster.setFromCamera(pointer, camera);
-    const allowed = proxies.filter(p => current.open > .55 || p.userData.partKey === 'temperature');
+    const allowed = proxies.filter(p => poseAt(current.reveal).open > .55 || p.userData.partKey === 'temperature');
     const hit = raycaster.intersectObjects(allowed, false)[0];
     if (hit) options.onSelect(hit.object.userData.partKey as ComponentKey);
   });

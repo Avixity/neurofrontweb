@@ -72,7 +72,7 @@ export function fixedTraceGeometry(
   const points = new Array<string>(last - first + 1);
   for (let index = first; index <= last; index++) {
     const sampleTime = index / sampleRate;
-    const x = width + (sampleTime - anchor) * speed;
+    const x = (anchor - sampleTime) * speed;
     const y = centre - sample(sampleTime);
     points[index - first] = `${index === first ? 'M' : 'L'}${x.toFixed(4)},${y.toFixed(4)}`;
   }
@@ -109,11 +109,11 @@ export function createTraceFlow(
       const bucket = Math.floor(time * 2);
       const anchor = bucket / 2;
       if (bucket !== previousBucket) {
-        // Samples stay at fixed times. Only the viewport moves between refreshes.
+        // New samples enter at the left; retained samples keep moving right.
         path.setAttribute('d', fixedTraceGeometry(sample, anchor, options));
         previousBucket = bucket;
       }
-      const x = -(time - anchor) * options.speed;
+      const x = (time - anchor) * options.speed;
       const y = options.centre * (1 - amplitude);
       const transform = `matrix(1 0 0 ${amplitude.toFixed(5)} ${x.toFixed(4)} ${y.toFixed(4)})`;
       if (transform !== previousTransform) {

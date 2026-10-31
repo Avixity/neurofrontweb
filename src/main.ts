@@ -1,7 +1,7 @@
 import { initGraphs } from './signals';
 import { components, type ComponentKey } from './components';
 import { initOpening } from './opening';
-import { storyAt, type StoryLayout, type StoryState } from './story';
+import { storyAt, poseAt, smooth, type StoryLayout, type StoryState } from './story';
 import type { DeviceScene } from './scene';
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
@@ -10,6 +10,7 @@ const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 const stage = $('#product-stage'), wrap = $('.scene-wrap'), host = $('#scene');
 document.body.append(stage);
 const story = $('#device-story'), inside = $('#inside'), signals = $('#signals'), exit = $('#story-exit');
+const heroFooter = $('.hero-bottom');
 const motionButton = $<HTMLButtonElement>('.motion-toggle');
 const graphMotionButton = $<HTMLButtonElement>('.graph-motion-toggle');
 const menuButton = $<HTMLButtonElement>('.menu-toggle'), mobileNav = $('#mobile-nav');
@@ -31,7 +32,7 @@ let base = { width: 1, height: 1 };
 let panelBounds = { left: innerWidth, top: innerHeight, side: false };
 let stageRect = { x: 0, y: 80, width: 1, height: 1, scale: 1 };
 let targetRect = { ...stageRect };
-let currentState: StoryState = { open: 0, explode: 0, sensor: 0, dock: 0 };
+let currentState: StoryState = { reveal: 0, sensor: 0, dock: 0 };
 const opening = initOpening(() => stageRect, () => { stateDirty = true; schedule(); });
 
 function closeMenu() {
@@ -185,20 +186,20 @@ function update(time: number) {
   if (needsMeasure) { measure(); stateDirty = true; }
   const y = scrollY;
   currentState = storyAt(y, layout);
-  if (expanded) currentState = { open: 1, explode: 0, sensor: 0, dock: 0 };
+  if (expanded) currentState = { reveal: .59, sensor: 0, dock: 0 };
   if (manualView) {
-    currentState.open = manualView === 'assembled' ? 0 : 1;
-    currentState.explode = manualView === 'exploded' ? 1 : 0;
+    currentState.reveal = manualView === 'assembled' ? .26 : manualView === 'exploded' ? 1 : .59;
     currentState.sensor = 0;
   }
   const dock = expanded ? 0 : currentState.dock;
-  const dockWidth = mobile ? 112 : 184, scale = 1 + (dockWidth / base.width - 1) * dock;
+  const dockWidth = mobile ? 104 : 166, scale = 1 + (dockWidth / base.width - 1) * dock;
+  const dockActionWidth = mobile ? 128 : 144;
   const dockCanvasHeight = base.height * dockWidth / base.width;
-  const dockHeight = Math.min(dockCanvasHeight, dockWidth * .60);
-  const dockTrim = (dockCanvasHeight - dockHeight) / 2;
   const x = mobile ? (viewport.width - base.width) / 2 : viewport.width - base.width;
   const top = mobile ? Math.max(76, 100 - y) : (viewport.height - base.height) / 2;
-  targetRect = { x: x + (viewport.width - dockWidth - 16 - x) * dock, y: top + (viewport.height - dockHeight - dockTrim - 42 - top) * dock, scale, width: base.width, height: base.height };
+  const dockX = viewport.width - 16 - (dockActionWidth + dockWidth) / 2;
+  const dockY = viewport.height - 66 - dockCanvasHeight / 2 - dockWidth * .25;
+  targetRect = { x: x + (dockX - x) * dock, y: top + (dockY - top) * dock, scale, width: base.width, height: base.height };
   if (expanded) {
     const viewerScale = mobile ? .98 : Math.min(1, viewport.width * .68 / base.width);
     const viewerTop = mobile ? viewport.height < 500 ? 120 : Math.max(180, (viewport.height - base.height) / 2 - 20) : 110;
@@ -226,19 +227,22 @@ function update(time: number) {
   });
   stageRect.width = base.width; stageRect.height = base.height;
   wrap.style.transform = `translate3d(${stageRect.x.toFixed(2)}px,${stageRect.y.toFixed(2)}px,0) scale(${stageRect.scale.toFixed(5)})`;
-  wrap.style.clipPath = dock > 0 ? `inset(${(dockTrim / dockCanvasHeight * 100 * dock).toFixed(3)}% 0 round ${(8 * dock / stageRect.scale).toFixed(2)}px)` : '';
+  const footerOpacity = 1 - smooth(y / (viewport.height * .23));
+  heroFooter.style.opacity = String(footerOpacity);
+  heroFooter.style.visibility = footerOpacity < .01 ? 'hidden' : '';
   const docked = !expanded && dock > .98;
   document.body.classList.toggle('model-docked', docked);
   document.body.classList.toggle('model-docking', dock > .05 && !expanded);
   dockButton.hidden = !docked || document.body.dataset.sceneState !== 'ready';
-  dockButton.style.width = `${dockWidth}px`; dockButton.style.height = `${dockHeight + 28}px`;
+  dockButton.style.width = `${dockActionWidth}px`;
   const visible = expanded || currentState.dock > 0 || y < layout.end;
   if (visible !== sceneVisible) { sceneVisible = visible; scene?.setVisible(visible); }
   if (stateDirty && !opening.active) {
     if (currentState.dock > .05 && !expanded && !panel.hidden) closeComponent(false);
     scene?.select(selected || (currentState.sensor > .5 ? activeSensor === 'thermal' ? 'temperature' : activeSensor === 'eda' ? 'gsr' : 'ad8232' : null));
     scene?.setStory(currentState, paused);
-    const view = currentState.explode > .5 ? 'exploded' : currentState.open > .5 ? 'open' : 'assembled';
+    const pose = poseAt(currentState.reveal);
+    const view = pose.explode > .5 ? 'exploded' : pose.open > .5 ? 'open' : 'assembled';
     viewButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.view === view)));
     if (document.body.dataset.sceneState === 'failed' || document.body.dataset.sceneState === 'static') {
       const image = $<HTMLImageElement>('.scene-fallback img');

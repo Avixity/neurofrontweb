@@ -2,9 +2,21 @@
 
 Checked on 31 October 2026 against the local production build at `http://localhost:4173`. TypeScript checking and the Vite production build passed. The initial optimization was tested with bundles `index-CXX81UyK.js` and `scene-Dq_I9zwR.js`; the measurements below belong to that revision, before the final panel, preview and graph adjustments.
 
-## Final publication refinements
+## Floating preview and viewer follow-up
 
-The final build uses `index-8LoZ-mQf.js`, `scene-1Lz6RNC6.js` and `index-CvNtsGJS.css`. Focused browser checks at 1440 × 900, 390 × 844 and 320 × 740 verified the requested follow-up changes:
+The follow-up build uses `index-DgXv5bq0.js`, `scene-DBWaoV6o.js` and `index-DBHXCjkL.css`. TypeScript and the production build passed. The focused browser suite passed 47/47 checks at desktop widths 1440 and 1920, and touch-emulated widths 390 and 320, with no page, console or HTTP errors.
+
+- The floating corner model has a visible shadow, no enclosing background, border or clipping, and a separate 44 px high Explore device button. The whole band, cable and controller fit. The previous stage caption is absent.
+- The hero footer disappears before passing behind the device. One reveal state now coordinates the camera handoff, a stationary interval, lid opening, another interval and component separation. Slow and fast forward/reverse samples preserve that phase order. The previous 1440 run covered 1,330 samples; the final build repeated the wide-screen sequence.
+- Actual viewer drags were measured using the projected ESP32 position: left/right moved the board by approximately -51/+51 px, and up/down by -18/+18 px, returning to its starting projection. Component selection beside the panel, same-canvas expansion, collapse and focus restoration passed on desktop and mobile.
+- Each viewport recorded 72 rightward live-trace frame pairs and none moving left. The calibrated path remained fixed. Numerical buffer-boundary checks retained identical sample heights and the expected positive horizontal displacement. Paused dock frame counters stayed unchanged.
+- Successful startup showed no photographic fallback flash, and no horizontal overflow was detected. Screenshots of the floating preview were visually inspected at all four widths.
+
+Evidence is retained in `.work/qa/floating-transition-qa.json`, `floating-transition-before-interruption.json` and `floating-*.png`. These checks use the desktop Chromium environment described below, not physical phones. No new whole-page performance measurement was made. A direct jump from the exploded view to the footer can still ease reassembly and docking at the same time; normal scroll targets finish reassembly first.
+
+## Previous publication refinements (8288a12)
+
+That release used `index-8LoZ-mQf.js`, `scene-1Lz6RNC6.js` and `index-CvNtsGJS.css`. Focused browser checks at 1440 × 900, 390 × 844 and 320 × 740 verified its follow-up changes:
 
 - Details move the model left of the desktop panel or above the mobile sheet. Actual component taps still work. Closing restores the original position, story copy and keyboard focus. Desktop inspection temporarily hides the surrounding story copy so it does not compete with the model.
 - The corner tile is 184 px wide on desktop and 112 px on mobile. Its tighter framing retains the complete band, cable and controller with visible margins. The expanded view retains the original canvas and restores dock focus when closed.
