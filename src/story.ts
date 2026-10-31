@@ -13,10 +13,13 @@ export function poseAt(reveal: number) {
 
 export function storyAt(y: number, layout: StoryLayout): StoryState {
   const lead = layout.height * .45;
-  const reveal = clamp((y - layout.inside + layout.height * .60) / Math.max(600, layout.signals - layout.inside + layout.height * .05));
+  const revealStart = Math.max(80, layout.inside - layout.height * .60);
+  const reveal = clamp((y - revealStart) / Math.max(600, layout.signals - layout.inside + layout.height * .05));
   const sensor = smooth((y - layout.signals + lead) / 250);
-  const returnSpan = Math.max(360, layout.height * .48);
+  const exitSpan = Math.max(1, layout.end - layout.exit + lead - 64);
+  const returnSpan = Math.min(Math.max(360, layout.height * .48), exitSpan * .62);
+  const returnPause = Math.min(60, exitSpan * .08);
   const returning = smooth((y - layout.exit + lead) / returnSpan);
-  const dock = smooth((y - layout.exit + lead - returnSpan - 60) / Math.max(240, layout.end - layout.exit - returnSpan - 60));
+  const dock = smooth((y - layout.exit + lead - returnSpan - returnPause) / (exitSpan - returnSpan - returnPause));
   return { reveal: reveal * (1 - returning), sensor: sensor * (1 - returning), dock };
 }

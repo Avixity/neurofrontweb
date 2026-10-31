@@ -30,6 +30,7 @@ let viewport = { width: innerWidth, height: innerHeight };
 let layout: StoryLayout = { inside: 0, signals: 0, exit: 0, end: 1, height: innerHeight };
 let base = { width: 1, height: 1 };
 let panelBounds = { left: innerWidth, top: innerHeight, side: false };
+let copyBounds: { top: number; bottom: number; right: number }[] = [];
 let stageRect = { x: 0, y: 80, width: 1, height: 1, scale: 1 };
 let targetRect = { ...stageRect };
 let currentState: StoryState = { reveal: 0, sensor: 0, dock: 0 };
@@ -169,6 +170,10 @@ function measure() {
   const nextBase = { width: mobile ? Math.min(innerWidth, height * 2.2) : Math.min(innerWidth * .64, 1100), height };
   const bounds = panel.hidden ? null : panel.getBoundingClientRect();
   panelBounds = bounds ? { left: bounds.left, top: bounds.top, side: bounds.width < innerWidth * .8 } : { left: innerWidth, top: innerHeight, side: false };
+  copyBounds = [...story.querySelectorAll<HTMLElement>('.hero-copy, .section-copy')].map(element => {
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top + y, bottom: rect.bottom + y, right: rect.right };
+  });
   needsMeasure = false;
   sceneResized = base.width !== nextBase.width || base.height !== nextBase.height;
   base = nextBase;
@@ -207,15 +212,18 @@ function update(time: number) {
   }
   if (!panel.hidden && dock < .05) {
     if (panelBounds.side) {
-      const availableWidth = Math.max(160, panelBounds.left - 32);
-      targetRect.scale = Math.min(targetRect.scale, availableWidth / base.width);
-      targetRect.x = panelBounds.left - base.width * targetRect.scale - 16;
+      const copyRight = expanded || viewport.width <= 760 || viewport.height <= 500 ? 0 : Math.max(0, ...copyBounds.filter(bounds => bounds.top < y + viewport.height && bounds.bottom > y + 80).map(bounds => bounds.right));
+      const availableLeft = copyRight + 24;
+      const availableWidth = Math.max(120, panelBounds.left - availableLeft - 16);
+      targetRect.scale = Math.min(targetRect.scale, availableWidth / base.width, (viewport.height - 116) / base.height);
+      targetRect.x = availableLeft + (availableWidth - base.width * targetRect.scale) / 2;
+      targetRect.y = Math.max(76, (viewport.height - base.height * targetRect.scale) / 2);
     } else {
       const minimumTop = expanded ? 180 : 76;
       const availableHeight = Math.max(90, panelBounds.top - minimumTop - 12);
       targetRect.scale = Math.min(targetRect.scale, availableHeight / base.height);
       targetRect.y = Math.min(targetRect.y, panelBounds.top - base.height * targetRect.scale - 12);
-      targetRect.x = (viewport.width - base.width * targetRect.scale) / 2;
+      targetRect.x = mobile || expanded ? (viewport.width - base.width * targetRect.scale) / 2 : viewport.width - base.width * targetRect.scale - 24;
     }
   }
   const alpha = paused || sceneResized ? 1 : 1 - Math.exp(-Math.min(lastTime ? time - lastTime : 16, 50) / 70);
@@ -227,6 +235,7 @@ function update(time: number) {
   });
   stageRect.width = base.width; stageRect.height = base.height;
   wrap.style.transform = `translate3d(${stageRect.x.toFixed(2)}px,${stageRect.y.toFixed(2)}px,0) scale(${stageRect.scale.toFixed(5)})`;
+  wrap.style.setProperty('--scene-scale', String(stageRect.scale));
   const footerOpacity = 1 - smooth(y / (viewport.height * .23));
   heroFooter.style.opacity = String(footerOpacity);
   heroFooter.style.visibility = footerOpacity < .01 ? 'hidden' : '';

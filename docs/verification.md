@@ -2,6 +2,28 @@
 
 Checked on 31 October 2026 against the local production build at `http://localhost:4173`. TypeScript checking and the Vite production build passed. The initial optimization was tested with bundles `index-CXX81UyK.js` and `scene-Dq_I9zwR.js`; the measurements below belong to that revision, before the final panel, preview and graph adjustments.
 
+## Section spacing and persistent page UI
+
+This build uses `index-CT_I0OnP.js`, `scene-CvCBkrKI.js` and `index-Dx-Aj5fP.css`. TypeScript and the production build passed. Main sections now grow with their content and use 64 px vertical padding on desktop and 48 px on mobile. The hero retains additional room for its footer, which stays within the text column.
+
+Measured content-bottom to next-section-label gaps:
+
+| Boundary | Before, 1440 px desktop | After | Before, 390 px mobile | After |
+| --- | ---: | ---: | ---: | ---: |
+| Hero actions to Inside | 376 px | 176 px | 300 px | 210 px |
+| Inside to Signals | 256 px | 128 px | 172 px | 96 px |
+| Signals to Return | 461 px | 128 px | 180 px | 96 px |
+| Return to Baseline | 435 px | 128 px | 606 px | 96 px |
+| Baseline to Dashboard | 240 px | 128 px | 156 px | 96 px |
+| Dashboard to Project | 250 px | 128 px | 156 px | 96 px |
+| Project to Closing | 196 px | 128 px | 156 px | 96 px |
+
+The same main-section gaps measured 128 px at 1920 px and 96 px at 320 px. The unchanged camera/lid/separation phases passed slow, fast and reverse scrolling. The return and docking spans adapt to the shorter content, with target docking complete 64 px before the story ends. Numerical samples also verified finite, reversible states and reassembly before target docking.
+
+Opening component details no longer applies visibility hiding to the page. On desktop, cached copy bounds place the model between the text and the right panel. Text, navigation, component controls and Pause remain available; Pause retains a 44 px target despite the model scaling. Actual model selection, closing, focus restoration, one-canvas reuse and overflow checks passed. Phones and narrow tablets retain a bottom sheet; it can cover lower page controls until closed or the page is scrolled. Short-landscape panel tests verified an on-screen model and working selection with touch and mouse input.
+
+The first focused run contained 45 assertions across 1440, 1920, 390, 320 and 1024 px widths. It identified three undersized Pause targets; visual inspection also identified the hero footer crossing the model. Both were fixed, along with a narrower footer-wrap issue. Focused retests verified those corrections, ending with an 8/8 final run and no page, console or HTTP errors. Evidence: `.work/qa/spacing-before.json`, `spacing-after.json`, `spacing-final-retest.json`, `spacing-last-smoke.json` and their screenshots. These are desktop-host browser tests with mobile emulation; physical-phone performance was not remeasured.
+
 ## Floating preview and viewer follow-up
 
 The follow-up build uses `index-DgXv5bq0.js`, `scene-DBWaoV6o.js` and `index-DBHXCjkL.css`. TypeScript and the production build passed. The focused browser suite passed 47/47 checks at desktop widths 1440 and 1920, and touch-emulated widths 390 and 320, with no page, console or HTTP errors.
