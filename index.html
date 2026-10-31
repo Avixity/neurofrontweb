@@ -20,6 +20,7 @@
     try {
       if (!matchMedia('(prefers-reduced-motion: reduce)').matches && !location.hash && new URLSearchParams(location.search).get('view') !== 'static' && sessionStorage.getItem('neurofront-intro-v2') !== 'seen') {
         document.documentElement.classList.add('intro-pending');
+        document.documentElement.dataset.introDeadline = String(performance.now() + 1500);
         setTimeout(() => document.documentElement.classList.remove('intro-pending'), 1500);
       }
     } catch {}

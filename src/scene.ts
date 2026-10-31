@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import gsap from 'gsap';
 import { buildDevice } from './model';
 
@@ -28,14 +27,7 @@ export async function createDeviceScene(host: HTMLElement, options: SceneOptions
 
   const world = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(34, 1, .1, 100);
-  const environment = new RoomEnvironment();
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const environmentMap = pmrem.fromScene(environment, .04);
-  world.environment = environmentMap.texture;
-  world.environmentIntensity = .7;
-  environment.dispose();
-  pmrem.dispose();
-  world.add(new THREE.HemisphereLight('#ecf1e9', '#293b32', 1.25));
+  world.add(new THREE.HemisphereLight('#ecf1e9', '#293b32', 1.55));
   const key = new THREE.DirectionalLight('#fff3dd', 2.8);
   key.position.set(-3, 7, 5);
   key.castShadow = true;
@@ -47,8 +39,8 @@ export async function createDeviceScene(host: HTMLElement, options: SceneOptions
   world.add(key);
   const rim = new THREE.DirectionalLight('#aed8cc', 2.4);
   rim.position.set(2, 4, -5); world.add(rim);
-  const fill = new THREE.DirectionalLight('#dce3df', .8);
-  fill.position.set(6, 1, 3); world.add(fill);
+  const fill = new THREE.DirectionalLight('#dce3df', 2.1);
+  fill.position.set(2, 3, 7); world.add(fill);
 
   const device = buildDevice();
   world.add(device.group);
@@ -59,7 +51,8 @@ export async function createDeviceScene(host: HTMLElement, options: SceneOptions
   const state = { open: 0, explode: 0, sensor: 0, focusX: .25, focusZoom: 1, pointerX: 0, pointerY: 0 };
   let selectedSensor = 'electrical';
   let paused = options.reducedMotion;
-  let introActive = options.intro && scrollY < 15 && document.documentElement.classList.contains('intro-pending');
+  let introActive = options.intro && scrollY < 15 && document.documentElement.classList.contains('intro-pending')
+    && performance.now() < Number(document.documentElement.dataset.introDeadline || 0);
   let dirty = true;
   let visible = true;
   let disposed = false;
@@ -205,15 +198,19 @@ export async function createDeviceScene(host: HTMLElement, options: SceneOptions
     const localWidth = (device.logo.geometry as THREE.PlaneGeometry).parameters.width;
     const finalLogoScale = localWidth / logoWidth;
     const counter = { value: .25 };
+    const introStarted = performance.now();
+    let introDeadline: ReturnType<typeof setTimeout>;
     finishIntro = () => {
       if (!introActive) return;
       introTween?.kill();
+      clearTimeout(introDeadline);
       originalMaterials.forEach((original, material) => { material.opacity = original.opacity; material.transparent = original.transparent; material.needsUpdate = true; });
       device.logo.visible = true;
       world.remove(introLogo); introLogo.geometry.dispose(); introLogo.material.dispose(); introTexture.dispose();
       document.body.classList.remove('intro-active');
       sceneWrap.style.left = ''; sceneWrap.style.width = ''; sceneWrap.style.top = ''; sceneWrap.style.height = '';
       skip.hidden = true; introActive = false;
+      camera.clearViewOffset();
       resize(); updateDevice();
       if (!options.reducedMotion) gsap.fromTo(['.hero-copy', '.hero-bottom', '.site-header'], { opacity: .1, y: 7 }, { opacity: 1, y: 0, duration: .45, clearProps: 'opacity,transform', stagger: .05 });
       options.onIntroComplete();
@@ -224,7 +221,7 @@ export async function createDeviceScene(host: HTMLElement, options: SceneOptions
     introTween = gsap.to(counter, {
       value: 1, duration: 1.8, ease: 'none',
       onUpdate() {
-        const t = counter.value;
+        const t = .25 + .75 * Math.min(1, (performance.now() - introStarted) / 1800);
         const progress = smooth(clamp((t - .22) / .78, 0, 1));
         const stroke = clamp(t / .25, 0, 1);
         const letters = clamp((t - .08) / .2, 0, 1);
@@ -239,16 +236,13 @@ export async function createDeviceScene(host: HTMLElement, options: SceneOptions
         const surface = smooth(clamp((t - .3) / .43, 0, 1));
         originalMaterials.forEach((original, material) => material.opacity = original.opacity * surface);
         const layout = smooth(clamp((t - .34) / .66, 0, 1));
-        if (!mobile()) {
-          sceneWrap.style.left = `${layout * 36}%`;
-          sceneWrap.style.width = `${100 - layout * 36}%`;
-        }
-        else {
-          const copyBottom = document.querySelector('.hero-copy')!.getBoundingClientRect().bottom;
-          sceneWrap.style.top = `${layout * Math.max(80, copyBottom + 15)}px`;
-          sceneWrap.style.height = `${THREE.MathUtils.lerp(innerHeight, 390, layout)}px`;
-        }
-        resize();
+        const copyBottom = document.querySelector('.hero-copy')!.getBoundingClientRect().bottom;
+        const viewportWidth = mobile() ? innerWidth : innerWidth * (1 - layout * .36);
+        const viewportHeight = mobile() ? THREE.MathUtils.lerp(innerHeight, 390, layout) : innerHeight;
+        const viewportLeft = mobile() ? 0 : innerWidth * layout * .36;
+        const viewportTop = mobile() ? layout * Math.max(80, copyBottom + 15) : 0;
+        // Shift the projection inside one full-size canvas; resizing the drawing buffer each frame is expensive.
+        camera.setViewOffset(viewportWidth, viewportHeight, -viewportLeft, -viewportTop, host.clientWidth, host.clientHeight);
         const finalCamera = heroPosition.clone();
         const aspectScale = Math.max(1, 1.04 / camera.aspect);
         finalCamera.multiplyScalar(mobile() ? Math.max(.88, aspectScale * .87) : aspectScale);
@@ -260,9 +254,11 @@ export async function createDeviceScene(host: HTMLElement, options: SceneOptions
         const initialScale = (2 * 9 * Math.tan(THREE.MathUtils.degToRad(34 / 2)) * (innerWidth / innerHeight) * (mobile() ? .7 : .36)) / logoWidth;
         introLogo.scale.setScalar(THREE.MathUtils.lerp(initialScale, finalLogoScale, progress));
         dirty = true;
+        if (t >= 1) finishIntro();
       },
       onComplete: finishIntro
     });
+    introDeadline = setTimeout(finishIntro, 1900);
   } else { document.documentElement.classList.remove('intro-pending'); updateDevice(); options.onIntroComplete(); }
 
   document.body.classList.add('has-3d');
@@ -270,7 +266,7 @@ export async function createDeviceScene(host: HTMLElement, options: SceneOptions
   window.addEventListener('pagehide', event => {
     if (event.persisted) return;
     disposed = true; renderer.setAnimationLoop(null); resizeObserver.disconnect(); visibilityObserver.disconnect();
-    device.dispose(); environmentMap.dispose(); ground.geometry.dispose(); (ground.material as THREE.Material).dispose(); renderer.dispose();
+    device.dispose(); ground.geometry.dispose(); (ground.material as THREE.Material).dispose(); renderer.dispose();
   });
   return {
     setStory(next) {

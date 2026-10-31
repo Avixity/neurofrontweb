@@ -35,11 +35,11 @@ The presentation retains HTML rather than adding a component framework. TypeScri
 
 ## Experience and fallbacks
 
-The opening mark becomes the printed logo on the controller lid. It can be skipped and plays once per browser session. Slow initialisation, an existing anchor, early scrolling or reduced motion skips the intro. The page never displays a fabricated loading percentage.
+The opening mark becomes the printed logo on the controller lid. It can be skipped and plays once per tab session. Slow initialisation, an existing anchor, early scrolling or reduced motion skips the intro. The page never displays a fabricated loading percentage.
 
 Scrolling opens the lid and separates the boards. The three view buttons provide direct access to those states, including with reduced motion. Sensor tabs also support the arrow, Home and End keys. The baseline slider illustrates the verified current calculation; it does not collect physiological data.
 
-Rendering is demand-driven, resolution is capped, and rendering stops when the story or tab is hidden. `?view=static` selects the photography fallback. WebGL errors also activate that fallback. Core text and all three sensor explanations remain readable without JavaScript.
+Rendering is demand-driven, resolution is capped, and rendering stops when the story or tab is hidden. `?view=static` selects the photography fallback. If 3D cannot initialise or its context is lost, that fallback activates. Core text and all three sensor explanations remain readable without JavaScript.
 
 ## Source boundaries
 
