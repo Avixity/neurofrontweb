@@ -3,6 +3,8 @@ import { components, type ComponentKey } from './components';
 import { initOpening } from './opening';
 import { storyAt, poseAt, smooth, type StoryLayout, type StoryState } from './story';
 import type { DeviceScene } from './scene';
+import { initViewerControls } from './viewer-controls';
+import { initGallery } from './gallery';
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
 const graphs = initGraphs();
@@ -15,12 +17,14 @@ const motionButton = $<HTMLButtonElement>('.motion-toggle');
 const graphMotionButton = $<HTMLButtonElement>('.graph-motion-toggle');
 const menuButton = $<HTMLButtonElement>('.menu-toggle'), mobileNav = $('#mobile-nav');
 const dockButton = $<HTMLButtonElement>('#dock-toggle'), viewer = $('#device-viewer');
+const viewerEntries = [...document.querySelectorAll<HTMLButtonElement>('[data-open-viewer]')];
 const panel = $('#component-panel');
 const viewButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-view]')];
 const partButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-component]')];
 const tabs = [...document.querySelectorAll<HTMLButtonElement>('[data-sensor]')];
 let scene: DeviceScene | undefined;
-let paused = motionPreference.matches, expanded = false, mobile = innerWidth <= 760;
+let paused = motionPreference.matches, expanded = false, mobile = innerWidth <= 760, photoOpen = false, galleryVisible = false;
+const viewerControls = initViewerControls(() => scene, () => expanded);
 let manualView = '', selected: ComponentKey | null = null, lastScroll = scrollY;
 let activeSensor = 'electrical';
 let panelOrigin: HTMLElement | null = null, viewerOrigin: HTMLElement | null = null;
@@ -30,11 +34,17 @@ let viewport = { width: innerWidth, height: innerHeight };
 let layout: StoryLayout = { inside: 0, signals: 0, exit: 0, end: 1, height: innerHeight };
 let base = { width: 1, height: 1 };
 let panelBounds = { left: innerWidth, top: innerHeight, side: false };
+let viewerBounds = { top: 160, bottom: innerHeight - 140, right: innerWidth - 20 };
 let copyBounds: { top: number; bottom: number; right: number }[] = [];
 let stageRect = { x: 0, y: 80, width: 1, height: 1, scale: 1 };
 let targetRect = { ...stageRect };
 let currentState: StoryState = { reveal: 0, sensor: 0, dock: 0 };
 const opening = initOpening(() => stageRect, () => { stateDirty = true; schedule(); });
+initGallery(open => {
+  photoOpen = open;
+  graphs.setPaused(paused || expanded || !panel.hidden || photoOpen);
+  stateDirty = true; schedule();
+});
 
 function closeMenu() {
   mobileNav.hidden = true; menuButton.setAttribute('aria-expanded', 'false'); menuButton.setAttribute('aria-label', 'Open navigation');
@@ -52,7 +62,7 @@ function setPaused(value: boolean) {
   motionButton.setAttribute('aria-pressed', String(value)); motionButton.textContent = value ? 'Resume motion' : 'Pause motion';
   graphMotionButton.setAttribute('aria-pressed', String(value)); graphMotionButton.textContent = motionButton.textContent;
   if (value) opening.skip();
-  graphs.setPaused(value || expanded || !panel.hidden); scene?.setPaused(value); stateDirty = true; schedule();
+  graphs.setPaused(value || expanded || !panel.hidden || photoOpen); scene?.setPaused(value); stateDirty = true; schedule();
 }
 motionButton.addEventListener('click', () => setPaused(!paused));
 graphMotionButton.addEventListener('click', () => setPaused(!paused));
@@ -112,7 +122,7 @@ function showComponent(part: ComponentKey, focus = true) {
 function closeComponent(restore = true) {
   panel.hidden = true; selected = null; scene?.select(null);
   document.body.classList.remove('component-open');
-  graphs.setPaused(paused || expanded);
+  graphs.setPaused(paused || expanded || photoOpen);
   needsMeasure = true; stateDirty = true; schedule();
   partButtons.forEach(button => button.setAttribute('aria-pressed', 'false'));
   if (restore && panelOrigin?.isConnected && !panelOrigin.closest('[hidden]')) panelOrigin.focus({ preventScroll: true });
@@ -130,7 +140,7 @@ function openViewer() {
   viewer.append(stage);
   document.body.classList.add('viewer-open'); document.body.style.overflow = 'hidden';
   ['main', '.site-header', 'footer'].forEach(selector => $(selector).inert = true);
-  scene.setExpanded(true); stateDirty = true; schedule(); $('#close-viewer').focus({ preventScroll: true });
+  scene.setExpanded(true); viewerControls.sync(); needsMeasure = true; stateDirty = true; schedule(); $('#close-viewer').focus({ preventScroll: true });
   graphs.setPaused(true);
   dockButton.setAttribute('aria-expanded', 'true');
 }
@@ -139,12 +149,13 @@ function closeViewer() {
   expanded = false; document.body.append(stage); viewer.hidden = true; closeComponent(false); manualView = '';
   document.body.classList.remove('viewer-open'); document.body.style.overflow = '';
   ['main', '.site-header', 'footer'].forEach(selector => $(selector).inert = false);
-  scene?.setExpanded(false); stateDirty = true; schedule();
-  graphs.setPaused(paused);
+  scene?.setExpanded(false); viewerControls.sync(); needsMeasure = true; stateDirty = true; schedule();
+  graphs.setPaused(paused || photoOpen);
   dockButton.setAttribute('aria-expanded', 'false');
   requestAnimationFrame(() => (viewerOrigin?.isConnected ? viewerOrigin : dockButton).focus({ preventScroll: true }));
 }
 dockButton.addEventListener('click', openViewer);
+viewerEntries.forEach(button => button.addEventListener('click', openViewer));
 $('#close-viewer').addEventListener('click', closeViewer);
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
@@ -170,6 +181,12 @@ function measure() {
   const nextBase = { width: mobile ? Math.min(innerWidth, height * 2.2) : Math.min(innerWidth * .64, 1100), height };
   const bounds = panel.hidden ? null : panel.getBoundingClientRect();
   panelBounds = bounds ? { left: bounds.left, top: bounds.top, side: bounds.width < innerWidth * .8 } : { left: innerWidth, top: innerHeight, side: false };
+  if (expanded) {
+    const controls = $('.viewer-controls').getBoundingClientRect();
+    const instruction = $('.viewer-instruction').getBoundingClientRect();
+    const landscape = innerHeight <= 600 && innerWidth >= 600;
+    viewerBounds = { top: instruction.bottom + 12, bottom: landscape ? innerHeight - 24 : controls.top - 16, right: landscape ? controls.left - 20 : innerWidth - 20 };
+  }
   copyBounds = [...story.querySelectorAll<HTMLElement>('.hero-copy, .section-copy')].map(element => {
     const rect = element.getBoundingClientRect();
     return { top: rect.top + y, bottom: rect.bottom + y, right: rect.right };
@@ -206,18 +223,21 @@ function update(time: number) {
   const dockY = viewport.height - 66 - dockCanvasHeight / 2 - dockWidth * .25;
   targetRect = { x: x + (dockX - x) * dock, y: top + (dockY - top) * dock, scale, width: base.width, height: base.height };
   if (expanded) {
-    const viewerScale = mobile ? .98 : Math.min(1, viewport.width * .68 / base.width);
-    const viewerTop = mobile ? viewport.height < 500 ? 120 : Math.max(180, (viewport.height - base.height) / 2 - 20) : 110;
-    targetRect = { x: (viewport.width - base.width * viewerScale) / 2, y: viewerTop, width: base.width, height: base.height, scale: viewerScale };
+    const availableWidth = viewerBounds.right - 20;
+    const availableHeight = Math.max(100, viewerBounds.bottom - viewerBounds.top);
+    const viewerScale = Math.min(1, availableWidth / base.width, availableHeight / base.height);
+    targetRect = { x: 20 + (availableWidth - base.width * viewerScale) / 2, y: viewerBounds.top + (availableHeight - base.height * viewerScale) / 2, width: base.width, height: base.height, scale: viewerScale };
   }
   if (!panel.hidden && dock < .05) {
     if (panelBounds.side) {
       const copyRight = expanded || viewport.width <= 760 || viewport.height <= 500 ? 0 : Math.max(0, ...copyBounds.filter(bounds => bounds.top < y + viewport.height && bounds.bottom > y + 80).map(bounds => bounds.right));
       const availableLeft = copyRight + 24;
       const availableWidth = Math.max(120, panelBounds.left - availableLeft - 16);
-      targetRect.scale = Math.min(targetRect.scale, availableWidth / base.width, (viewport.height - 116) / base.height);
+      const regionTop = expanded ? viewerBounds.top : 76;
+      const regionBottom = expanded ? viewerBounds.bottom : viewport.height - 40;
+      targetRect.scale = Math.min(targetRect.scale, availableWidth / base.width, Math.max(100, regionBottom - regionTop) / base.height);
       targetRect.x = availableLeft + (availableWidth - base.width * targetRect.scale) / 2;
-      targetRect.y = Math.max(76, (viewport.height - base.height * targetRect.scale) / 2);
+      targetRect.y = regionTop + Math.max(0, (regionBottom - regionTop - base.height * targetRect.scale) / 2);
     } else {
       const minimumTop = expanded ? 180 : 76;
       const availableHeight = Math.max(90, panelBounds.top - minimumTop - 12);
@@ -242,9 +262,9 @@ function update(time: number) {
   const docked = !expanded && dock > .98;
   document.body.classList.toggle('model-docked', docked);
   document.body.classList.toggle('model-docking', dock > .05 && !expanded);
-  dockButton.hidden = !docked || document.body.dataset.sceneState !== 'ready';
+  dockButton.hidden = !docked || galleryVisible || document.body.dataset.sceneState !== 'ready';
   dockButton.style.width = `${dockActionWidth}px`;
-  const visible = expanded || currentState.dock > 0 || y < layout.end;
+  const visible = !photoOpen && (expanded || !(galleryVisible && docked) && (currentState.dock > 0 || y < layout.end));
   if (visible !== sceneVisible) { sceneVisible = visible; scene?.setVisible(visible); }
   if (stateDirty && !opening.active) {
     if (currentState.dock > .05 && !expanded && !panel.hidden) closeComponent(false);
@@ -272,13 +292,21 @@ window.addEventListener('scroll', () => {
 window.addEventListener('resize', () => { needsMeasure = true; schedule(); });
 window.visualViewport?.addEventListener('resize', () => { needsMeasure = true; schedule(); });
 const layoutObserver = new ResizeObserver(() => { needsMeasure = true; schedule(); });
-[story, inside, signals, exit, panel, $('.hero-copy')].forEach(element => layoutObserver.observe(element));
+[story, inside, signals, exit, panel, $('.hero-copy'), $('.viewer-controls'), $('.viewer-instruction')].forEach(element => layoutObserver.observe(element));
+const galleryObserver = new IntersectionObserver(entries => {
+  galleryVisible = entries[0].isIntersecting;
+  document.body.classList.toggle('gallery-active', galleryVisible);
+  schedule();
+}, { rootMargin: '-80px 0px 0px' });
+galleryObserver.observe($('#prototype'));
 document.fonts.ready.then(() => { needsMeasure = true; schedule(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(frame); frame = 0; lastTime = 0; } else { stateDirty = true; schedule(); } });
 
 function useFallback(state: 'failed' | 'static' = 'failed') {
   opening.skip(); closeViewer();
   scene = undefined;
+  viewerControls.sync();
+  viewerEntries.forEach(button => { button.disabled = true; button.title = 'The 3D view is unavailable. Explore the photographs below.'; });
   $('.scene-fallback').hidden = false;
   document.body.dataset.sceneState = state; document.body.classList.add('no-3d'); document.body.classList.remove('has-3d');
   stateDirty = true; schedule();
@@ -288,7 +316,10 @@ async function startScene() {
   try {
     const { createDeviceScene } = await import('./scene');
     scene = await createDeviceScene(host, { mobile, reducedMotion: paused, onFailure: () => useFallback(), onSelect: part => showComponent(part), onExpand: openViewer });
+    scene.setVisible(sceneVisible);
     document.body.dataset.sceneState = 'ready'; document.body.classList.add('has-3d');
+    viewerControls.sync();
+    viewerEntries.forEach(button => { button.disabled = false; });
     opening.attach(scene); stateDirty = true; schedule();
   } catch (error) {
     console.warn('The 3D view could not initialise. Prototype photographs are available instead.', error); useFallback();
@@ -300,4 +331,4 @@ motionButton.setAttribute('aria-pressed', String(paused)); motionButton.textCont
 graphMotionButton.setAttribute('aria-pressed', String(paused)); graphMotionButton.textContent = motionButton.textContent;
 schedule();
 requestAnimationFrame(() => { void startScene(); });
-window.addEventListener('pagehide', event => { if (!event.persisted) { scene?.dispose(); graphs.dispose(); layoutObserver.disconnect(); } });
+window.addEventListener('pagehide', event => { if (!event.persisted) { scene?.dispose(); graphs.dispose(); viewerControls.dispose(); layoutObserver.disconnect(); galleryObserver.disconnect(); } });

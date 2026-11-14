@@ -26,6 +26,8 @@ The production preview uses `http://localhost:4173`. Vercel builds with `npm run
 - `styles.css`: base visual system; `experience.css` controls the persistent scene and viewer; `readability.css` sets readable type and responsive controls; `dashboard-image.css` presents the supplied dashboard screenshot.
 - `src/main.ts`: navigation, sensor tabs, scroll coordination and progressive enhancement.
 - `src/scene.ts`: one Three.js renderer, adaptive quality, raycast selection, camera and rendering lifecycle.
+- `src/viewer-controls.ts`: bounded zoom, reset, keyboard controls and toolbar synchronization.
+- `src/gallery.ts` and `refinements.css`: editorial photo gallery, original/studio comparison, accessible photo expansion and viewer controls.
 - `src/story.ts`: reversible scroll state, from assembled device to docked model.
 - `src/opening.ts`: SVG heartbeat and lettering animation, with a projected handoff onto the lid.
 - `src/components.ts`: verified component descriptions and reference-image mapping.
@@ -36,6 +38,8 @@ The production preview uses `http://localhost:4173`. Vercel builds with `npm run
 
 The presentation retains HTML rather than adding a component framework. TypeScript separates state, rendering and interactions; Vite bundles Three.js separately from the explanatory content. Scroll updates no longer create GSAP tweens.
 
+The prototype gallery contains two clearly labelled AI-assisted studio edits and the original headband photograph. Every view links to its untouched source. [Photo art direction](docs/photo-art-direction.md) records the exact edit prompts and limitations. Images load progressively, decode before replacement, and keep a fixed frame to avoid layout jumps.
+
 ## Experience and fallbacks
 
 The accurately traced SVG mark draws its heartbeat, resolves its lettering and becomes the printed logo on the controller lid. It plays on every full load, including refresh, with a restrained reduced-motion alternative. There is no visible Skip intro button; scrolling or using navigation still releases the opening. The loading state never shows a prototype photograph. A completed first model frame changes the scene to ready; failed 3D or explicit static mode enables photographs. A slow initialisation releases the opening after 2.4 seconds so navigation and content remain available.
@@ -45,6 +49,8 @@ Sections grow with their content and share 64px vertical padding on desktop and 
 Six components can be selected by tapping the model or using accessible buttons. Component details keep the page copy and controls visible. On desktop, the model fits the central space between the copy and the right-hand details panel. Phones and narrow tablets use a bottom sheet, with the model fitted above it. Closing details restores its previous framing. The expanded viewer reuses the same renderer; dragging turns the device in the pointer's direction on both axes. It supports Close, Escape and focus restoration. Sensor tabs support arrow, Home and End keys. The baseline slider illustrates the current calculation; it does not collect physiological data.
 
 Rendering stops when the model is stationary or the tab is hidden. Mobile starts with a reduced geometry tier, two directional lights, a cheap contact shadow and a conservative resolution; measured moving-frame cost adjusts resolution within a capped range. Geometry quality is chosen at startup, including touch-device orientation changes. Layout measurements are cached and refreshed on resize or observed content changes. Scroll events coalesce into one update per animation frame.
+
+Open 3D viewer links are available in the hardware explanation and photo gallery. The expanded viewer adds zoom from 75% to 185% using buttons, the mouse wheel over the canvas, touch pinch, or the + and - keys. Reset view (0) restores rotation and 100% zoom. Closing also resets the camera for the scroll story. The stationary corner model steps aside while the photo gallery is visible, and returns outside that section; this keeps source links and captions clear. Expanding a photograph suspends the 3D scene and moving traces until the dialog closes.
 
 Live example traces move continuously from left to right while visible and stop offscreen, in hidden tabs, when paused or with reduced motion. The calibrated baseline stays fixed. Signal samples retain their shape as they move through clipped SVG windows; only the live comparison amplitude responds to the slider. The graphs never create a WebGL renderer. `?view=static` selects photography. Core text and all three sensor explanations remain readable without JavaScript. `?inspect=1` adds projected component coordinates to scene diagnostics for repeatable raycast tests.
 

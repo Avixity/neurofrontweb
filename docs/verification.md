@@ -1,5 +1,7 @@
 ﻿# Refinement verification
 
+For the 15 November 2026 photo-gallery and zoom release, see [editorial-refinement.md](editorial-refinement.md). The measurements below describe the earlier layout and performance passes.
+
 Checked on 31 October 2026 against the local production build at `http://localhost:4173`. TypeScript checking and the Vite production build passed. The initial optimization was tested with bundles `index-CXX81UyK.js` and `scene-Dq_I9zwR.js`; the measurements below belong to that revision, before the final panel, preview and graph adjustments.
 
 ## Section spacing and persistent page UI

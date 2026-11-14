@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildDevice } from './model';
 import type { ComponentKey } from './components';
 import { poseAt, type StoryState } from './story';
+import { clampViewerZoom, VIEWER_ZOOM } from './viewer-controls';
 
 type Options = { mobile: boolean; reducedMotion: boolean; onFailure: () => void; onSelect: (part: ComponentKey) => void; onExpand: () => void };
 export interface DeviceScene {
@@ -10,6 +11,9 @@ export interface DeviceScene {
   setPaused(value: boolean): void;
   setVisible(value: boolean): void;
   setExpanded(value: boolean): void;
+  getZoom(): number;
+  setZoom(value: number): void;
+  resetView(): void;
   resize(width: number, height: number, mobile: boolean): void;
   setIntro(progress: number): void;
   projectLogo(): { x: number; y: number }[];
@@ -62,7 +66,9 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
   const logoMaterial = device.logo.material as THREE.MeshBasicMaterial;
   logoMaterial.map = logoTexture; logoMaterial.needsUpdate = true;
 
-  const current = { reveal: 0, sensor: 0, dock: 0, yaw: 0, pitch: 0, viewer: 0 };
+  const current: StoryState & { yaw: number; pitch: number; viewer: number; zoom: number } = {
+    reveal: 0, sensor: 0, dock: 0, yaw: 0, pitch: 0, viewer: 0, zoom: VIEWER_ZOOM.initial
+  };
   const target = { ...current };
   let selection: ComponentKey | null = null;
   let paused = options.reducedMotion, visible = true, expanded = false, disposed = false;
@@ -100,7 +106,11 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
     cameraTarget.set(pose.handoff * .22 + current.dock * .4, .3 + pose.explode * .30, 0);
     cameraDirection.set(5.4, 7.3 + pose.handoff * 1.2, 9.4 - current.sensor * .5);
     cameraDirection.multiplyScalar(Math.max(.92, 1.04 / camera.aspect));
-    if (mobile) cameraDirection.multiplyScalar(.8 - current.viewer * .16 + pose.explode * .08);
+    if (mobile) {
+      cameraDirection.multiplyScalar(.8 - current.viewer * .16 + pose.explode * .08);
+      const narrowViewerClearance = THREE.MathUtils.clamp((1.38 - camera.aspect) * 1.2, 0, .22);
+      cameraDirection.multiplyScalar(1 + current.viewer * narrowViewerClearance);
+    }
     cameraDirection.multiplyScalar(1 + pose.handoff * .035);
     cameraDirection.multiplyScalar(1 - current.dock * (mobile ? .25 : .30));
     cameraDirection.multiplyScalar(.78 + intro * .22);
@@ -110,7 +120,26 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
       orbitDirection.setFromSphericalCoords(radius, phi, .52 + current.yaw);
       cameraDirection.lerp(orbitDirection, current.viewer);
     }
+    const zoom = 1 + (current.zoom - 1) * current.viewer;
+    if (camera.zoom !== zoom) { camera.zoom = zoom; camera.updateProjectionMatrix(); }
     camera.position.copy(cameraTarget).add(cameraDirection); camera.lookAt(cameraTarget);
+  }
+  function notifyZoom() {
+    host.dispatchEvent(new CustomEvent('neurofront:viewerzoom', { bubbles: true, detail: { zoom: target.zoom } }));
+  }
+  function setZoom(value: number) {
+    if (!expanded || disposed) return;
+    const zoom = clampViewerZoom(value);
+    if (target.zoom === zoom) return;
+    target.zoom = zoom;
+    if (paused) { current.zoom = zoom; positionCamera(); updateLabels(); }
+    notifyZoom(); invalidate();
+  }
+  function resetView() {
+    if (disposed) return;
+    target.zoom = VIEWER_ZOOM.initial; target.yaw = target.pitch = 0;
+    if (paused) { current.zoom = target.zoom; current.yaw = current.pitch = 0; positionCamera(); updateLabels(); }
+    notifyZoom(); invalidate();
   }
   function updateLabels() {
     const showLabels = intro === 1 && poseAt(current.reveal).explode > .6 && current.dock < .15 && !expanded;
@@ -143,6 +172,7 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
     host.dataset.triangles = String(renderer.info.render.triangles);
     host.dataset.pixelRatio = pixelRatio.toFixed(2);
     host.dataset.shadowMap = String(renderer.shadowMap.enabled);
+    host.dataset.zoom = camera.zoom.toFixed(3);
     dirty = false;
   }
   function tick(time: number) {
@@ -188,13 +218,37 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
     positionCamera(); updateLabels(); invalidate();
   }
   let down: { x: number; y: number; scroll: number; pointer: number; moved: boolean } | null = null;
+  const activePointers = new Map<number, { x: number; y: number }>();
+  let pinch: { distance: number; zoom: number } | null = null;
+  function pointerDistance() {
+    const [first, second] = activePointers.values();
+    return first && second ? Math.hypot(first.x - second.x, first.y - second.y) : 0;
+  }
   const canvas = renderer.domElement;
+  function clearPointers() {
+    for (const id of activePointers.keys()) if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
+    activePointers.clear(); pinch = null; down = null;
+  }
   canvas.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
+    if (expanded) {
+      activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      canvas.setPointerCapture(event.pointerId);
+      if (activePointers.size > 1) {
+        const distance = pointerDistance();
+        if (distance > 0) pinch = { distance, zoom: target.zoom };
+        if (down) down.moved = true;
+        return;
+      }
+    }
     down = { x: event.clientX, y: event.clientY, scroll: scrollY, pointer: event.pointerId, moved: false };
-    if (expanded) canvas.setPointerCapture(event.pointerId);
   });
   canvas.addEventListener('pointermove', event => {
+    if (expanded && activePointers.has(event.pointerId)) activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (expanded && pinch && activePointers.size > 1) {
+      setZoom(pinch.zoom * pointerDistance() / pinch.distance);
+      return;
+    }
     if (!down || down.pointer !== event.pointerId) return;
     const dx = event.clientX - down.x, dy = event.clientY - down.y;
     if (Math.hypot(dx, dy) > 9) down.moved = true;
@@ -203,9 +257,20 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
       down.x = event.clientX; down.y = event.clientY; invalidate();
     }
   });
-  canvas.addEventListener('pointercancel', () => { down = null; });
+  function releasePointer(event: PointerEvent) {
+    const wasPinching = pinch !== null || activePointers.size > 1;
+    activePointers.delete(event.pointerId);
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    if (!wasPinching) return false;
+    pinch = null;
+    if (activePointers.size > 1) pinch = { distance: Math.max(1, pointerDistance()), zoom: target.zoom };
+    const remaining = activePointers.entries().next().value;
+    down = remaining ? { pointer: remaining[0], ...remaining[1], scroll: scrollY, moved: true } : null;
+    return true;
+  }
+  canvas.addEventListener('pointercancel', event => { releasePointer(event); down = null; });
   canvas.addEventListener('pointerup', event => {
-    if (!down) return;
+    if (releasePointer(event) || !down || down.pointer !== event.pointerId) return;
     const tap = !down.moved && Math.hypot(event.clientX - down.x, event.clientY - down.y) < 9 && Math.abs(scrollY - down.scroll) < 8;
     down = null;
     if (!tap) return;
@@ -218,6 +283,15 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
     const hit = raycaster.intersectObjects(allowed, false)[0];
     if (hit) options.onSelect(hit.object.userData.partKey as ComponentKey);
   });
+  const onWheel = (event: WheelEvent) => {
+    if (!expanded || event.defaultPrevented || event.ctrlKey || event.metaKey || !event.deltaY) return;
+    const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? height : 1;
+    const delta = THREE.MathUtils.clamp(event.deltaY * unit, -120, 120);
+    const zoom = clampViewerZoom(target.zoom * Math.exp(-delta * .0015));
+    if (Math.abs(zoom - target.zoom) < .0001) return;
+    event.preventDefault(); setZoom(zoom);
+  };
+  canvas.addEventListener('wheel', onWheel, { passive: false });
   const onVisibility = () => {
     if (document.hidden) { if (frame) cancelAnimationFrame(frame); frame = 0; lastTime = 0; }
     else invalidate();
@@ -229,6 +303,8 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
     if (disposed) return;
     disposed = true; cancelAnimationFrame(frame); frame = 0;
     document.removeEventListener('visibilitychange', onVisibility);
+    canvas.removeEventListener('wheel', onWheel);
+    clearPointers();
     proxies.forEach(p => { p.removeFromParent(); p.geometry.dispose(); (p.material as THREE.Material).dispose(); });
     device.dispose(); ground.geometry.dispose(); (ground.material as THREE.Material).dispose(); shadowTexture.dispose(); logoTexture.dispose(); key.shadow.dispose(); renderer.dispose();
   }
@@ -241,6 +317,9 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
   host.dataset.ready = 'true';
   return {
     resize,
+    getZoom: () => target.zoom,
+    setZoom,
+    resetView,
     setStory(next, instant = false) {
       if (Object.entries(next).every(([key, value]) => target[key as keyof StoryState] === value) && !instant) return;
       Object.assign(target, next);
@@ -250,7 +329,14 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
     select(part) { if (part === selection) return; selection = part; selectionDirty = true; invalidate(); },
     setPaused(value) { paused = value; if (value) { Object.assign(current, target); updateDevice(); } invalidate(); },
     setVisible(value) { visible = value; if (value) invalidate(); else { cancelAnimationFrame(frame); frame = 0; lastTime = 0; } },
-    setExpanded(value) { expanded = value; target.viewer = value ? 1 : 0; target.yaw = target.pitch = 0; canvas.style.touchAction = value ? 'none' : 'pan-y'; selectionDirty = true; invalidate(); },
+    setExpanded(value) {
+      expanded = value; target.viewer = value ? 1 : 0;
+      target.zoom = VIEWER_ZOOM.initial; target.yaw = target.pitch = 0;
+      clearPointers();
+      canvas.style.touchAction = value ? 'none' : 'pan-y';
+      if (paused) { Object.assign(current, target); updateDevice(); }
+      selectionDirty = true; notifyZoom(); invalidate();
+    },
     setIntro(value) { intro = value; device.logo.visible = value === 1; positionCamera(); dirty = true; schedule(); },
     projectLogo() {
       device.group.updateMatrixWorld(true); camera.updateMatrixWorld();
@@ -263,6 +349,7 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
     },
     capturePart(part) {
       const priorPosition = camera.position.clone(), priorRotation = camera.quaternion.clone();
+      const priorZoom = camera.zoom, priorGroundVisibility = ground.visible;
       const visibility = new Map<THREE.Object3D, boolean>();
       const selectedObjects = new Set<THREE.Object3D>();
       device.parts[part].traverse(object => selectedObjects.add(object));
@@ -274,9 +361,16 @@ export async function createDeviceScene(host: HTMLElement, options: Options): Pr
       const center = bounds.getCenter(new THREE.Vector3());
       const size = Math.max(.7, bounds.getSize(new THREE.Vector3()).length());
       camera.position.copy(center).add(new THREE.Vector3(1.1, 1.8, 2).normalize().multiplyScalar(size * 2.4)); camera.lookAt(center);
-      renderer.render(world, camera); const image = canvas.toDataURL('image/webp', .85);
-      visibility.forEach((value, object) => object.visible = value); ground.visible = true;
-      camera.position.copy(priorPosition); camera.quaternion.copy(priorRotation); draw(); return image;
+      camera.zoom = 1; camera.updateProjectionMatrix();
+      try {
+        renderer.render(world, camera);
+        return canvas.toDataURL('image/webp', .85);
+      } finally {
+        visibility.forEach((value, object) => object.visible = value); ground.visible = priorGroundVisibility;
+        camera.position.copy(priorPosition); camera.quaternion.copy(priorRotation);
+        camera.zoom = priorZoom; camera.updateProjectionMatrix();
+        if (!disposed) draw();
+      }
     },
     dispose
   };
